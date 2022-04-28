@@ -5,11 +5,13 @@ from collections import defaultdict
 import shutil
 from tqdm import tqdm
 
-from config import PATH_ORIGIN, PATH_DESTIN, DAY_STARTS_AT, PROCESS_AFTER, REMOVE_FROM_SD
+from config import PATH_ORIGIN, PATH_DESTIN, \
+    DAY_STARTS_AT, PROCESS_AFTER, INCLUDE_FIRST, REMOVE_FROM_SD
 
 imgpaths = []
 
 # Get original filepaths =================================
+
 for directory in os.listdir(PATH_ORIGIN):
     path = os.path.join(PATH_ORIGIN, directory)
     files = os.listdir(path)
@@ -19,6 +21,13 @@ for directory in os.listdir(PATH_ORIGIN):
 
 # KEYS: date. VALUES: list of origin_filepath
 imgdates = defaultdict(list)
+
+
+if INCLUDE_FIRST:
+    first_date = PROCESS_AFTER
+else:
+    first_date = PROCESS_AFTER + timedelta(days = 1)
+
 
 for imgpath in imgpaths:
     dt = datetime.fromtimestamp(os.path.getctime(imgpath))
