@@ -35,7 +35,7 @@ def get_filepaths():
         modified_dt = dt - timedelta(hours=DAY_STARTS_AT)
 
         # Pictures too old to classify (ideally already classified)cd
-        if modified_dt < datetime(**PROCESS_AFTER):
+        if modified_dt < datetime(**first_date):
             continue
 
         datestamp = modified_dt.strftime('%Y%m%d')
