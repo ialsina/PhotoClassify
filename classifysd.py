@@ -88,20 +88,23 @@ def copy(imgdates):
     imgdates2 = {origin_fpath: date for date, origin_fpaths in imgdates.items() for origin_fpath in origin_fpaths}
 
     # values of imgdates are lists
-    for origin_fpath, datestamp in tqdm(imgdates2.items()):
-        fname = os.path.basename(origin_fpath)
-        destin_path = os.path.join(PATH_DESTIN, datestamp)
-        destin_fpath = os.path.join(destin_path, fname)
+    with tqdm(total = len(imgdates2)) as progress:
+        for origin_fpath, datestamp in imgdates2.items():
+            fname = os.path.basename(origin_fpath)
+            destin_path = os.path.join(PATH_DESTIN, datestamp)
+            destin_fpath = os.path.join(destin_path, fname)
+            progress.set_description_str('{:>8s}/{:<12s}'.format(datestamp, fname))
+            progress.update()
 
-        if not os.path.exists(destin_fpath):
-            try:
-                shutil.copy2(origin_fpath, destin_path)
-                successful.append(origin_fpath)
-            except Exception as e:
-                unsuccessful.append(origin_fpath)
-                exceptions_set.add(e)
-        else:
-            existing.append(origin_fpath)
+            if not os.path.exists(destin_fpath):
+                try:
+                    shutil.copy2(origin_fpath, destin_path)
+                    successful.append(origin_fpath)
+                except Exception as e:
+                    unsuccessful.append(origin_fpath)
+                    exceptions_set.add(e)
+            else:
+                existing.append(origin_fpath)
 
     exceptions = list(exceptions_set)
 
