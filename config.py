@@ -49,7 +49,7 @@ class PathConfig:
 
 @dataclass
 class DateConfig:
-    day_starts_at: datetime
+    day_starts_at: timedelta
     process_after: datetime
     auto_date: bool = False
     include_first: bool = True
@@ -60,17 +60,17 @@ class DateConfig:
             try:
                 return read_date()
             except (FileNotFoundError, ValueError):
-                return None
+                pass
         if self.include_first:
             return self.process_after
         return self.process_after + timedelta(days=1)
 
     @classmethod
     def parse(cls, dct):
-        day_starts_at = dct.get("day_starts_at", "00:00:00")
+        day_starts_at = dct.get("day_starts_at", 0)
         process_after = dct.get("process_after", "01-01-1000")
         return cls(
-            day_starts_at=datetime.strptime(day_starts_at, r"%H:%M:%S"),
+            day_starts_at=timedelta(hours=day_starts_at),
             process_after=datetime.strptime(process_after, r"%d-%m-%Y"),
             auto_date=dct.get("auto_date", True),
         )
