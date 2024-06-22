@@ -1,12 +1,7 @@
 #!/usr/bin/python3
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from difflib import diff_bytes, unified_diff 
-from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-import shutil
-from typing import Callable, Dict, List, Optional, Mapping, Sequence
+from typing import Callable, Sequence
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,10 +22,6 @@ class RelationPath(Path):
     def candidates(self, value):
         self._candidates = value
     
-    def clean_candidates(self):
-        for cand in self._candidates:
-            raise NotImplementedError
-    
     @property
     def twins(self):
         return self._twins
@@ -41,19 +32,19 @@ class RelationPath(Path):
 
 
 def _get_paths():
-    paths_orig = []
-    paths_dest = []
+    paths1 = []
+    paths2 = []
     print("Collecting paths...")
     try:
         for root, _, files in cfg.path.origin.walk():
             for file in files:
-                paths_orig.append(RelationPath(root / file))
+                paths1.append(RelationPath(root / file))
         for root, _, files in cfg.path.destination.walk():
             for file in files:
-                paths_dest.append(root / file)
-    except Exception as exc:
+                paths2.append(root / file)
+    except Exception as exc: # pylint: disable=W0718
         print(f"Error while collecting paths: {exc}")
-    return paths_orig, paths_dest
+    return paths1, paths2
 
 def _same_name(path1: Path, path2: Path):
     return path1.name == path2.name
@@ -64,40 +55,50 @@ def _same_size(path1: Path, path2: Path):
 def _same_ctime(path1: Path, path2: Path):
     return path1.stat().st_ctime == path2.stat().st_ctime
 
-def find_add_candidates(paths_orig: Sequence[RelationPath], paths_dest: Sequence[Path], *funs: Callable[[Path, Path], bool]) -> None:
+def find_add_candidates(
+    paths1: Sequence[RelationPath],
+    paths2: Sequence[Path],
+    *funs: Callable[[Path, Path], bool]
+) -> None:
     """
     Find and add candidate files from the destination paths that match the original paths based on specified criteria.
 
     Args:
-        paths_orig (Sequence[RelationPath]): List of original file paths.
-        paths_dest (Sequence[Path]): List of destination file paths.
+        paths1 (Sequence[RelationPath]): List of original file paths.
+        paths2 (Sequence[Path]): List of destination file paths.
         *funs (Callable[[Path, Path], bool]): Functions to determine if a file in the destination is a candidate.
     """
-    files_dest = {fpath.name: fpath for fpath in paths_dest}
+    files_dest = {fpath.name: fpath for fpath in paths2}
     print("Finding candidates...")
 
-    for fpath in tqdm(paths_orig, leave=False):
+    for fpath in tqdm(paths1, leave=False):
         candidates = []
         dest_path = files_dest.get(fpath.name)
         if dest_path and all(fun(fpath, dest_path) for fun in funs):
             candidates.append(dest_path)
         fpath.candidates = candidates
 
-def add_twins_parallel(paths_orig: Sequence[RelationPath], paths_dest: Sequence[Path]) -> None:
+def add_twins_parallel(paths1: Sequence[RelationPath]) -> None:
     """
     Find and add twin files using parallel processing.
 
     Args:
-        paths_orig (Sequence[RelationPath]): List of original file paths.
-        paths_dest (Sequence[Path]): List of destination file paths.
+        paths1 (Sequence[RelationPath]): List of original file paths.
+        paths2 (Sequence[Path]): List of destination file paths.
     """
     print("Finding twins in parallel...")
-    with ThreadPoolExecutor(max_workers=15) as executor:
-        futures = {executor.submit(compare_files, fpath, pd): (fpath, pd) for fpath in paths_orig for pd in fpath.candidates}
+    with ProcessPoolExecutor(max_workers=8) as executor:
+        futures = {
+            executor.submit(compare_files, p1, p2): (p1, p2)
+            for p1
+            in paths1
+            for p2
+            in p1.candidates
+        }
         for future in tqdm(as_completed(futures), total=len(futures), leave=False):
-            fpath, pd = futures[future]
+            p1, p2 = futures[future]
             if future.result():
-                fpath.twins.append(pd)
+                p1.twins.append(p2)
 
 
 def compare_files(file1: Path, file2: Path) -> bool:
@@ -115,8 +116,8 @@ def compare_files(file1: Path, file2: Path) -> bool:
         return f1.read() == f2.read()
 
 def save_histograms(
-    paths_orig,
-    paths_dest,
+    paths1,
+    paths2,
     filepath="hists.png",
     nbins=100,
     split_input=True,
@@ -135,10 +136,10 @@ def save_histograms(
             stacked=stacked,
         )
     fig, ax = plt.subplots(2, sharex=True)
-    input_twins = [p for p in paths_orig if p.twins]
-    input_no_twins = [p for p in paths_orig if p not in input_twins]
-    output_twins = [p for p in paths_dest if any(p in po.twins for po in paths_orig)]
-    output_no_twins = [p for p in paths_dest if p not in output_twins]
+    input_twins = [p for p in paths1 if p.twins]
+    input_no_twins = [p for p in paths1 if p not in input_twins]
+    output_twins = [p for p in paths2 if any(p in po.twins for po in paths1)]
+    output_no_twins = [p for p in paths2 if p not in output_twins]
     if split_input:
         _add_hist(ax[0], [input_twins, input_no_twins], label=["Twins", "No-twins"])
     else:
@@ -155,8 +156,8 @@ def save_histograms(
 if __name__ == "__main__":
     paths_orig, paths_dest = _get_paths()
     find_add_candidates(paths_orig, paths_dest, _same_name, _same_size)
-    add_twins_parallel(paths_orig, paths_dest)
-    save_histograms(paths_orig, paths_dest, filter_input=True, filter_output=True)
+    add_twins_parallel(paths_orig)
+    save_histograms(paths_orig, paths_dest, split_input=True, filter_output=True)
     with_candidates = [p for p in paths_orig if any(p.candidates)]
     without_candidates = [p for p in paths_orig if not any(p.candidates)]
     with_twins = [p for p in paths_orig if any(p.twins)]
