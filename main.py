@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -148,14 +149,27 @@ def create_directories(imgdates):
         target_path.mkdir(parents=True, exist_ok=True)
 
 
-def copy(imgdates):
+def _copy_file_task(origin_fpath, destin_path):
+    """Helper function for copy"""
+    try:
+        destin_fpath = destin_path / origin_fpath.name
+        if not destin_fpath.exists():
+            shutil.copy2(origin_fpath, destin_path)
+            return 'success', origin_fpath, None
+        return 'existing', origin_fpath, None
+    except (FileNotFoundError, PermissionError, OSError) as exc:
+        return 'error', origin_fpath, exc
+
+def copy(imgdates, max_workers: Optional[int] = None):
     """
     Copies image files to a destination path organized by date.
 
     Parameters
     ----------
-    imgdates : Dict[str, List[str]]
+    imgdates : Dict[str, List[Path]]
         A dictionary where keys are dates and values are lists of origin file paths.
+    max_workers : int, optional
+        The maximum number of worker processes to use. Defaults to the number of processors on the machine.
 
     Returns
     -------
@@ -170,34 +184,29 @@ def copy(imgdates):
     # KEYS: origin_filepath. VALUES: date
     imgdates2 = {
         origin_fpath: date
-        for date, origin_fpaths
-        in imgdates.items()
-        for origin_fpath
-        in origin_fpaths
+        for date, origin_fpaths in imgdates.items()
+        for origin_fpath in origin_fpaths
     }
 
+    tasks = []
     # values of imgdates are lists
-    with tqdm(total = len(imgdates2)) as pbar:
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
         for origin_fpath, datestamp in imgdates2.items():
-            fname = origin_fpath.name
             destin_path = _get_target_path(datestamp)
-            destin_fpath = destin_path / fname
-            pbar.set_description_str(
-                '/'.join(
-                    destin_fpath.parts[(-3 if cfg.path.quarters else -2):]
-                )
-            )
-            pbar.update()
+            task = executor.submit(_copy_file_task, origin_fpath, destin_path)
+            tasks.append(task)
 
-            if not destin_fpath.exists():
-                try:
-                    shutil.copy2(origin_fpath, destin_path)
+        with tqdm(total=len(tasks), desc="Copying files", unit="file") as pbar:
+            for future in as_completed(tasks):
+                result, origin_fpath, exc = future.result()
+                if result == "success":
                     successful.append(origin_fpath)
-                except (FileNotFoundError, PermissionError, OSError) as exc:
+                elif result == "existing":
+                    existing.append(origin_fpath)
+                elif result == "error":
                     unsuccessful.append(origin_fpath)
                     exceptions.add(exc)
-            else:
-                existing.append(origin_fpath)
+                pbar.update()
 
     return CopyResult(
         total=imgdates2,
