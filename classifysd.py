@@ -1,6 +1,5 @@
 #! /usr/bin/python3
 import os
-from PIL import Image, ExifTags
 from datetime import datetime, timedelta
 from collections import defaultdict
 import shutil
@@ -58,6 +57,7 @@ for origin_fpath, datestamp in tqdm(imgdates2.items()):
     fname = os.path.basename(origin_fpath)
     destin_path = os.path.join(PATH_DESTIN, datestamp)
     destin_fpath = os.path.join(destin_path, fname)
+    excp_set = set()
 
     if not os.path.exists(destin_fpath):
         try:
@@ -65,6 +65,7 @@ for origin_fpath, datestamp in tqdm(imgdates2.items()):
             successful.append(origin_fpath)
         except Exception as e:
             unsuccessful.append(origin_fpath)
+            excp_set.add(e)
     else:
         existing.append(origin_fpath)
 
@@ -79,5 +80,7 @@ if len(unsuccessful) > 0:
     print('***')
     print('Unsuccessful copies: {} out of {}'.format(len(unsuccessful), len(imgdates2)))
     print('\n\t'.join(unsuccessful))
+    print('> Errors encountered:')
+    print('\n\t'.join([str(e) for e in excp_set]))
 
 print('***')
