@@ -9,10 +9,36 @@ from tqdm import tqdm
 
 from config import PATH_ORIGIN, PATH_DESTIN, \
     DAY_STARTS_AT, PROCESS_AFTER, INCLUDE_FIRST, REMOVE_FROM_SD, \
-    VERBOSE
+    AUTO_DATE, VERBOSE
 
 
-def get_filepaths():
+def read_date():
+    with open('.lastdate', 'r') as f:
+        info = f.readline()
+        first_date = datetime.fromisoformat(info)
+    return first_date
+
+
+def write_date():
+    with open('.lastdate', 'w') as f:
+        f.write(datetime.now().date().isoformat())
+
+
+def get_first_date():
+    if AUTO_DATE:
+        try:
+            return read_date()
+        except Exception as e:
+            first_date = None
+    if INCLUDE_FIRST:
+        first_date = datetime(**PROCESS_AFTER)
+    else:
+        first_date = datetime(**PROCESS_AFTER) + timedelta(days=1)
+    return first_date
+
+
+
+def get_filepaths(first_date):
     imgpaths = []
 
     for directory in os.listdir(PATH_ORIGIN):
@@ -25,17 +51,12 @@ def get_filepaths():
     # KEYS: date. VALUES: list of origin_filepath
     imgdates = defaultdict(list)
 
-    if INCLUDE_FIRST:
-        first_date = PROCESS_AFTER
-    else:
-        first_date = PROCESS_AFTER + timedelta(days=1)
-
     for imgpath in imgpaths:
         dt = datetime.fromtimestamp(os.path.getctime(imgpath))
         modified_dt = dt - timedelta(hours=DAY_STARTS_AT)
 
         # Pictures too old to classify (ideally already classified)cd
-        if modified_dt < datetime(**first_date):
+        if modified_dt < first_date:
             continue
 
         datestamp = modified_dt.strftime('%Y%m%d')
@@ -58,12 +79,10 @@ def create_directories(imgdates):
 
 def copy(imgdates):
 
-    if VERBOSE >= 1:
-        print('Copying files:\nFROM: {}\nTO: {}\nSTARTING DATE: {}'.format(PATH_ORIGIN, PATH_DESTIN, PROCESS_AFTER))
-
     successful = []
     existing = []
     unsuccessful = []
+    exceptions_set = set()
 
     # KEYS: origin_filepath. VALUES: date
     imgdates2 = {origin_fpath: date for date, origin_fpaths in imgdates.items() for origin_fpath in origin_fpaths}
@@ -73,7 +92,6 @@ def copy(imgdates):
         fname = os.path.basename(origin_fpath)
         destin_path = os.path.join(PATH_DESTIN, datestamp)
         destin_fpath = os.path.join(destin_path, fname)
-        exceptions_set = set()
 
         if not os.path.exists(destin_fpath):
             try:
@@ -85,7 +103,7 @@ def copy(imgdates):
         else:
             existing.append(origin_fpath)
 
-        exceptions = list(exceptions_set)
+    exceptions = list(exceptions_set)
 
     return imgdates2, successful, existing, unsuccessful, exceptions
 
@@ -116,10 +134,20 @@ def report(total, successful, existing, unsuccessful, exceptions):
 
 
 def main():
-    _, image_dates = get_filepaths()
+    first_date = get_first_date()
+    _, image_dates = get_filepaths(first_date)
     create_directories(image_dates)
+    if VERBOSE >= 1:
+        print('Copying files:\n'
+              '\t         FROM: {:<30s}\n'
+              '\t           TO: {:<30s}\n'
+              '\tSTARTING DATE: {:<30s}'.format(PATH_ORIGIN,
+                                         PATH_DESTIN,
+                                         first_date.date().strftime("%a %d/%m/%Y")))
     result_tuple = copy(image_dates)
     report(*result_tuple)
+    if AUTO_DATE:
+        write_date()
 
 if __name__ == "__main__":
     main()
