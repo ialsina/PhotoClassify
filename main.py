@@ -2,7 +2,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from collections import defaultdict
-from pathlib import Path
 import shutil
 from typing import Callable, Dict, List, Optional
 
@@ -84,7 +83,7 @@ def get_filepaths(first_date: Optional[datetime] = None):
 
     Returns
     -------
-    Tuple[List[str], Dict[str, List[str]]]
+    Tuple[List[Path], Dict[str, List[Path]]]
         A tuple containing:
             - imgpaths: A list of all image file paths found.
             - imgdates: A dictionary where keys are dates (as strings in 'YYYYMMDD' format)
@@ -93,16 +92,14 @@ def get_filepaths(first_date: Optional[datetime] = None):
     if first_date is None:
         first_date = cfg.date.first_date
     imgpaths = []
-    for directory in cfg.path.origin.iterdir():
-        if directory.is_dir():
-            imgpaths.extend(
-                str(file) for file in directory.iterdir() if file.is_file()
-            )
+    for root, _, files in cfg.path.origin.walk():
+        for file in files:
+            imgpaths.append(root / file)
 
     imgdates = defaultdict(list)
     for imgpath in imgpaths:
-        dt = datetime.fromtimestamp(Path(imgpath).stat().st_ctime)
-        modified_dt = dt - timedelta(hours=cfg.date.day_starts_at)
+        dt = datetime.fromtimestamp(imgpath.stat().st_ctime)
+        modified_dt = dt - cfg.date.day_starts_at
         # Pictures too old to classify (ideally already classified)
         if modified_dt < first_date:
             continue
@@ -126,7 +123,7 @@ def create_directories(imgdates):
         If a directory cannot be created.
     """
     for datestamp in imgdates.keys():
-        target_path = cfg.path.destination + datestamp
+        target_path = cfg.path.destination / datestamp
         if target_path.exists():
             return
         try:
@@ -168,7 +165,7 @@ def copy(imgdates):
     # values of imgdates are lists
     with tqdm(total = len(imgdates2)) as pbar:
         for origin_fpath, datestamp in imgdates2.items():
-            fname = Path(origin_fpath).name
+            fname = origin_fpath.name
             destin_path = cfg.path.destination / datestamp
             destin_fpath = destin_path / fname
             pbar.set_description_str(
