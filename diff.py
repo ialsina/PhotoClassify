@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from difflib import diff_bytes, unified_diff 
@@ -43,41 +44,16 @@ def _get_paths():
     paths_orig = []
     paths_dest = []
     print("Collecting paths...")
-    for root, dirs, files in cfg.path.origin.walk():
-        for file in files:
-            paths_orig.append(RelationPath(root / file))
-    for root, dirs, files in cfg.path.destination.walk():
-        for file in files:
-            paths_dest.append(root / file)
+    try:
+        for root, _, files in cfg.path.origin.walk():
+            for file in files:
+                paths_orig.append(RelationPath(root / file))
+        for root, _, files in cfg.path.destination.walk():
+            for file in files:
+                paths_dest.append(root / file)
+    except Exception as exc:
+        print(f"Error while collecting paths: {exc}")
     return paths_orig, paths_dest
-
-def _add_candidates(paths_orig: Sequence[Path], paths_dest: Sequence[Path], *funs):
-    files_dest = [fpath.name for fpath in paths_dest]
-    stats_orig = {path: path.stat() for path in paths_orig}
-    stats_dest = {path: path.stat() for path in paths_dest}
-
-    print("Finding candidates...")
-    for fpath in tqdm(paths_orig, leave=False):
-        if fpath.name in files_dest:
-            fpath.candidates = [
-                path_dest
-                for path_dest
-                in paths_dest
-                if all(fun(fpath, path_dest) for fun in funs)
-            ]
-        else:
-            fpath.candidates = []
-
-def _add_twins(paths_orig: Sequence[Path], paths_dest: Sequence[Path]):
-    print("Finding twins...")
-    for fpath in tqdm(paths_orig, leave=False, disable=False):
-        for pd in fpath.candidates:
-            with open(fpath, "rb") as a, open(pd, "rb") as b:
-                delta = diff_bytes(unified_diff, a, b)
-                try:
-                    next(delta)
-                except StopIteration:
-                    fpath.twins.append(pd)
 
 def _same_name(path1: Path, path2: Path):
     return path1.name == path2.name
@@ -88,28 +64,99 @@ def _same_size(path1: Path, path2: Path):
 def _same_ctime(path1: Path, path2: Path):
     return path1.stat().st_ctime == path2.stat().st_ctime
 
-def _save_hists(filepath="hists.png", nbins=100, filter_output=True):
-    global paths_orig, paths_dest
+def find_add_candidates(paths_orig: Sequence[RelationPath], paths_dest: Sequence[Path], *funs: Callable[[Path, Path], bool]) -> None:
+    """
+    Find and add candidate files from the destination paths that match the original paths based on specified criteria.
+
+    Args:
+        paths_orig (Sequence[RelationPath]): List of original file paths.
+        paths_dest (Sequence[Path]): List of destination file paths.
+        *funs (Callable[[Path, Path], bool]): Functions to determine if a file in the destination is a candidate.
+    """
+    files_dest = {fpath.name: fpath for fpath in paths_dest}
+    print("Finding candidates...")
+
+    for fpath in tqdm(paths_orig, leave=False):
+        candidates = []
+        dest_path = files_dest.get(fpath.name)
+        if dest_path and all(fun(fpath, dest_path) for fun in funs):
+            candidates.append(dest_path)
+        fpath.candidates = candidates
+
+def add_twins_parallel(paths_orig: Sequence[RelationPath], paths_dest: Sequence[Path]) -> None:
+    """
+    Find and add twin files using parallel processing.
+
+    Args:
+        paths_orig (Sequence[RelationPath]): List of original file paths.
+        paths_dest (Sequence[Path]): List of destination file paths.
+    """
+    print("Finding twins in parallel...")
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        futures = {executor.submit(compare_files, fpath, pd): (fpath, pd) for fpath in paths_orig for pd in fpath.candidates}
+        for future in tqdm(as_completed(futures), total=len(futures), leave=False):
+            fpath, pd = futures[future]
+            if future.result():
+                fpath.twins.append(pd)
+
+
+def compare_files(file1: Path, file2: Path) -> bool:
+    """
+    Compare two files byte-by-byte.
+
+    Args:
+        file1 (Path): The first file to compare.
+        file2 (Path): The second file to compare.
+
+    Returns:
+        bool: True if files are identical, False otherwise.
+    """
+    with open(file1, "rb") as f1, open(file2, "rb") as f2:
+        return f1.read() == f2.read()
+
+def save_histograms(
+    paths_orig,
+    paths_dest,
+    filepath="hists.png",
+    nbins=100,
+    split_input=True,
+    filter_output=True,
+    stacked=True,
+):
+    def _add_hist(ax, lst, label):
+        ax.hist(
+            [
+                np.array([p.stat().st_size for p in lst_el]) / 1e6
+                for lst_el
+                in lst
+            ],
+            bins=nbins,
+            label=label,
+            stacked=stacked,
+        )
     fig, ax = plt.subplots(2, sharex=True)
+    input_twins = [p for p in paths_orig if p.twins]
+    input_no_twins = [p for p in paths_orig if p not in input_twins]
+    output_twins = [p for p in paths_dest if any(p in po.twins for po in paths_orig)]
+    output_no_twins = [p for p in paths_dest if p not in output_twins]
+    if split_input:
+        _add_hist(ax[0], [input_twins, input_no_twins], label=["Twins", "No-twins"])
+    else:
+        _add_hist(ax[0], [input_twins + input_no_twins], label=[""])
     if filter_output:
-        paths_dest = [
-            p
-            for p
-            in paths_dest
-            if any(p in po.candidates for po in paths_orig)
-        ]
-    ax[0].hist(np.array([p.stat().st_size for p in paths_orig]) / 1e6, bins=nbins)
-    ax[1].hist(np.array([p.stat().st_size for p in paths_dest]) / 1e6, bins=nbins)
+        _add_hist(ax[1], [output_twins], label="")
+    else:
+        _add_hist(ax[1], [output_twins, output_no_twins], label=["Twins", "Unrelated"])
     ax[1].set_xlabel("Size (MB)")
-    ax[0].set_ylabel("File count (input files)")
-    ax[1].set_ylabel("File count (output files)")
+    ax[0].set_ylabel("File count (input)")
+    ax[1].set_ylabel("File count (output)")
     fig.savefig(filepath)
 
 if __name__ == "__main__":
     paths_orig, paths_dest = _get_paths()
-    _add_candidates(paths_orig, paths_dest, _same_name, _same_size)
-    _add_twins(paths_orig, paths_dest)
-    _save_hists(filter_output=True)
+    find_add_candidates(paths_orig, paths_dest, _same_name, _same_size)
+    add_twins_parallel(paths_orig, paths_dest)
+    save_histograms(paths_orig, paths_dest, filter_input=True, filter_output=True)
     with_candidates = [p for p in paths_orig if any(p.candidates)]
     without_candidates = [p for p in paths_orig if not any(p.candidates)]
     with_twins = [p for p in paths_orig if any(p.twins)]
