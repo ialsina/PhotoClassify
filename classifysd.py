@@ -3,10 +3,13 @@ import os
 from datetime import datetime, timedelta
 from collections import defaultdict
 import shutil
+from typing import Tuple, List, Any, Set
+
 from tqdm import tqdm
 
 from config import PATH_ORIGIN, PATH_DESTIN, \
-    DAY_STARTS_AT, PROCESS_AFTER, INCLUDE_FIRST, REMOVE_FROM_SD
+    DAY_STARTS_AT, PROCESS_AFTER, INCLUDE_FIRST, REMOVE_FROM_SD, \
+    VERBOSE
 
 
 def get_filepaths():
@@ -55,7 +58,8 @@ def create_directories(imgdates):
 
 def copy(imgdates):
 
-    print('Copying files:\nFROM: {}\nTO: {}\nSTARTING DATE: {}'.format(PATH_ORIGIN, PATH_DESTIN, PROCESS_AFTER))
+    if VERBOSE >= 1:
+        print('Copying files:\nFROM: {}\nTO: {}\nSTARTING DATE: {}'.format(PATH_ORIGIN, PATH_DESTIN, PROCESS_AFTER))
 
     successful = []
     existing = []
@@ -69,7 +73,7 @@ def copy(imgdates):
         fname = os.path.basename(origin_fpath)
         destin_path = os.path.join(PATH_DESTIN, datestamp)
         destin_fpath = os.path.join(destin_path, fname)
-        excp_set = set()
+        exceptions_set = set()
 
         if not os.path.exists(destin_fpath):
             try:
@@ -77,30 +81,45 @@ def copy(imgdates):
                 successful.append(origin_fpath)
             except Exception as e:
                 unsuccessful.append(origin_fpath)
-                excp_set.add(e)
+                exceptions_set.add(e)
         else:
             existing.append(origin_fpath)
 
+        exceptions = list(exceptions_set)
+
+    return imgdates2, successful, existing, unsuccessful, exceptions
+
+
+def report(total, successful, existing, unsuccessful, exceptions):
+
+    total_len = len(total)
+
     print('Copy terminated')
-    print('Successful copies: {} out of {}'.format(len(successful), len(imgdates2)))
-    if len(existing) > 0:
-        print('***')
-        print('Existing files: {} out of {}'.format(len(existing), len(imgdates2)))
+
+    if VERBOSE >= 2:
+        print('Successful copies: {} out of {}'.format(len(successful), total_len))
+        if len(existing) > 0:
+            print('***')
+            print('Existing files: {} out of {}'.format(len(existing), total_len))
+    if VERBOSE >= 3:
         print('\n\t'.join(existing))
-    if len(unsuccessful) > 0:
-        print('***')
-        print('Unsuccessful copies: {} out of {}'.format(len(unsuccessful), len(imgdates2)))
-        print('\n\t'.join(unsuccessful))
+    if VERBOSE >= 2:
+        if len(unsuccessful) > 0:
+            print('***')
+            print('Unsuccessful copies: {} out of {}'.format(len(unsuccessful), total_len))
+            print('\n\t'.join(unsuccessful))
+    if VERBOSE >= 3:
         print('> Errors encountered:')
-        print('\n\t'.join([str(e) for e in excp_set]))
+        print('\n\t'.join([str(e) for e in exceptions]))
 
     print('***')
 
 
 def main():
-    _, imgdates = get_filepaths()
-    create_directories(imgdates)
-    copy(imgdates)
+    _, image_dates = get_filepaths()
+    create_directories(image_dates)
+    result_tuple = copy(image_dates)
+    report(*result_tuple)
 
 if __name__ == "__main__":
     main()
