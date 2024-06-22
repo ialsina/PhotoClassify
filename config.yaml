@@ -7,10 +7,10 @@ PATH:
 DATE:
   day_starts_at: "05:00:00" # 24h format
   process_after: "01-01-1000" # DD-MM-YYYY format
+  include_first: True
   auto_date: True
 
 COPY:
-  include_first: True
   remove_from_sd: False # Not implemented
   auto_first: False # Not implemented
   verbose: False

@@ -1,11 +1,24 @@
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict
+from typing import Dict
 from yaml import safe_load
 
 ROOT = Path(__file__).resolve().parent
-ROOT_CONFIG = ROOT / "config.yaml"
+CONFIG_PATH = ROOT / "config.yaml"
+LAST_DATE_PATH = ROOT / ".lastdate"
+
+def read_date():
+    with open(LAST_DATE_PATH, 'r', encoding="utf-8") as rf:
+        return datetime.fromisoformat(
+            rf.readline()
+        )
+
+def write_date():
+    with open(LAST_DATE_PATH, 'w', encoding="utf-8") as wf:
+        wf.write(
+            datetime.now().date().isoformat()
+        )
 
 @dataclass
 class PathConfig:
@@ -38,7 +51,19 @@ class PathConfig:
 class DateConfig:
     day_starts_at: datetime
     process_after: datetime
-    auto_date: bool
+    auto_date: bool = False
+    include_first: bool = True
+
+    @property
+    def first_date(self):
+        if self.auto_date:
+            try:
+                return read_date()
+            except (FileNotFoundError, ValueError):
+                return None
+        if self.include_first:
+            return self.process_after
+        return self.process_after + timedelta(days=1)
 
     @classmethod
     def parse(cls, dct):
@@ -52,7 +77,6 @@ class DateConfig:
 
 @dataclass
 class CopyConfig:
-    include_first: bool = True
     remove_from_sd: bool = False
     auto_first: bool = False
     verbose: bool = False
@@ -85,5 +109,5 @@ class Config:
 
         
 
-with open(ROOT_CONFIG, "r", encoding="utf-8") as cf:
+with open(CONFIG_PATH, "r", encoding="utf-8") as cf:
     config = Config.parse(safe_load(cf))
