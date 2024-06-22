@@ -40,7 +40,7 @@ class PathConfig:
             for key, value
             in dct.items()
         })
-        if path_config.safe and not path_config._is_dir:
+        if path_config.safe and not path_config._is_dir():
             raise AssertionError(
                 "Some paths are either invalid or unmounted."
             )
