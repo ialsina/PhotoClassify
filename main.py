@@ -70,6 +70,27 @@ class CopyResult:
             stdout('\n\t'.join([str(e) for e in self.exceptions]))
         stdout('***')
 
+def _get_target_path(datestamp: str):
+    """
+    Get the target path for a given datestamp.
+
+    Parameters
+    ----------
+    datestamp : str
+        The datestamp string in 'YYYYMMDD' format.
+
+    Returns
+    -------
+    Path
+        The target path for the given datestamp.
+    """
+    if not cfg.path.quarters:
+        return cfg.path.destination / datestamp
+    date = datetime.strptime(datestamp, r"%Y%m%d")
+    quarter = f"{date.year:4d}Q{(date.month - 1) // 3 + 1:1d}"
+    return cfg.path.destination / quarter / datestamp
+
+
 def get_filepaths(first_date: Optional[datetime] = None):
     """
     Retrieves image file paths from the origin directory,
@@ -123,15 +144,8 @@ def create_directories(imgdates):
         If a directory cannot be created.
     """
     for datestamp in imgdates.keys():
-        target_path = cfg.path.destination / datestamp
-        if target_path.exists():
-            return
-        try:
-            target_path.mkdir()
-        except FileNotFoundError as exc:
-            raise FileNotFoundError(
-                "Could not create file: " + str(cfg.path.destination / datestamp)
-            ) from exc
+        target_path = _get_target_path(datestamp)
+        target_path.mkdir(parents=True, exist_ok=True)
 
 
 def copy(imgdates):
@@ -166,10 +180,12 @@ def copy(imgdates):
     with tqdm(total = len(imgdates2)) as pbar:
         for origin_fpath, datestamp in imgdates2.items():
             fname = origin_fpath.name
-            destin_path = cfg.path.destination / datestamp
+            destin_path = _get_target_path(datestamp)
             destin_fpath = destin_path / fname
             pbar.set_description_str(
-                f"{datestamp:>8s}/{fname:<12s}"
+                '/'.join(
+                    destin_fpath.parts[(-3 if cfg.path.quarters else -2):]
+                )
             )
             pbar.update()
 

@@ -24,6 +24,7 @@ def write_date():
 class PathConfig:
     origin: Path
     destination: Path
+    quarters: bool = False
     safe: bool = True
 
     def _is_dir(self):
@@ -67,12 +68,12 @@ class DateConfig:
 
     @classmethod
     def parse(cls, dct):
-        day_starts_at = dct.get("day_starts_at", 0)
-        process_after = dct.get("process_after", "01-01-1000")
+        day_starts_at = dct.pop("day_starts_at", 0)
+        process_after = dct.pop("process_after", "01-01-1000")
         return cls(
             day_starts_at=timedelta(hours=day_starts_at),
             process_after=datetime.strptime(process_after, r"%d-%m-%Y"),
-            auto_date=dct.get("auto_date", True),
+            **dct
         )
 
 @dataclass

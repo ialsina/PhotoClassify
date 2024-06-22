@@ -1,14 +1,15 @@
 ---
 PATH:
-  origin: ''
-  destination: ''
+  origin: ...
+  destination: ...
+  quarters: ...
   safe: True
 
 DATE:
-  day_starts_at: "05:00:00" # 24h format
+  day_starts_at: ...
   process_after: "01-01-1000" # DD-MM-YYYY format
   include_first: True
-  auto_date: True
+  auto_date: False
 
 COPY:
   remove_from_sd: False # Not implemented
