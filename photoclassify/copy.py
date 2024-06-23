@@ -12,15 +12,18 @@ from tqdm import tqdm
 try:
     from .config import get_config, write_date, Config
     from .diff import compare_files
+    from .utils import new_name
 except ImportError:
     from config import get_config, write_date, Config
     from diff import compare_files
+    from utils import new_name
 
+MAX_RENAME_ALLOWED = 20
 
 class CopyStatus(Enum):
     SUCCESS = 1
     EXISTING = 2
-    SAME_NAME = 3
+    RENAMED = 3
     ERROR = 4
 
 @dataclass
@@ -32,14 +35,14 @@ class CopyResult:
     ----------
     total : Dict[str, str]
         A dictionary where keys are origin file paths and values are dates.
-    successful : List[str]
+    successful : List[Tuple[str, str]]
         A list of successfully copied file paths.
-    existing : List[str]
+    existing : List[Tuple[str, str]]
         A list of file paths that already existed in the destination.
-    same_name : List[str]
+    renamed: List[Tuple[str, str]]
         A list of file paths that didn't exist in the destination, but that
         weren't copied because that would have produced a name collision.
-    unsuccessful : List[str]
+    unsuccessful : List[Tuple[str, str]]
         A list of file paths that failed to copy.
     exceptions : List[Exception]
         A list of exceptions encountered during copying.
@@ -47,9 +50,13 @@ class CopyResult:
     total: Dict[str, str]
     successful: List[str] = field(default_factory=list)
     existing: List[str] = field(default_factory=list)
-    same_name: List[str] = field(default_factory=list)
+    renamed: List[str] = field(default_factory=list)
     unsuccessful: List[str] = field(default_factory=list)
     exceptions: Set[Exception] = field(default_factory=set)
+
+    @staticmethod
+    def _tuples_str_generator(sequence_of_tuples):
+        return '\n\t'.join(f"{str(ofp)} -> {str(dfp)}" for ofp, dfp in sequence_of_tuples)
 
     def report(
         self,
@@ -77,17 +84,17 @@ class CopyResult:
                 stdout('***')
                 stdout(f'Existing files: {len(self.existing)} out of {total_len}')
         if verbose >= 3:
-            stdout('\n\t'.join(str(p) for p in self.existing))
+            stdout(self._tuples_str_generator(self.existing))
         if verbose >= 2:
-            if len(self.same_name) > 0:
+            if len(self.renamed) > 0:
                 stdout('***')
-                stdout(f'Same name files (different but colliding name, not copied): {len(self.same_name)} out of {total_len}')
-                stdout('\n\t'.join(str(p) for p in self.same_name))
+                stdout(f'Renamed files: {len(self.renamed)} out of {total_len}')
+                stdout(self._tuples_str_generator(self.renamed))
         if verbose >= 2:
             if len(self.unsuccessful) > 0:
                 stdout('***')
                 stdout(f'Unsuccessful copies: {len(self.unsuccessful)} out of {total_len}')
-                stdout('\n\t'.join(str(p) for p in self.unsuccessful))
+                stdout(self._tuples_str_generator(self.unsuccessful))
         if verbose >= 3:
             stdout('> Errors encountered:')
             stdout('\n\t'.join(str(e) for e in self.exceptions))
@@ -178,12 +185,17 @@ def _copy_file_task(origin_fpath, destin_path):
         destin_fpath = destin_path / origin_fpath.name
         if not destin_fpath.exists():
             shutil.copy2(origin_fpath, destin_path)
-            return CopyStatus.SUCCESS, origin_fpath, None
+            return CopyStatus.SUCCESS, origin_fpath, destin_fpath, None
         if compare_files(origin_fpath, destin_fpath):
-            return CopyStatus.EXISTING, origin_fpath, None
-        return CopyStatus.SAME_NAME, origin_fpath, None
+            return CopyStatus.EXISTING, origin_fpath, destin_fpath, None
+        for _ in range(MAX_RENAME_ALLOWED):
+            destin_fpath = new_name(destin_fpath)
+            if not destin_fpath.exists():
+                shutil.copy2(origin_fpath, destin_fpath)
+                return CopyStatus.RENAMED, origin_fpath, destin_fpath, None
+        return CopyStatus.ERROR, origin_fpath, None, RuntimeError("Too many rename attempts")
     except (FileNotFoundError, PermissionError, OSError) as exc:
-        return CopyStatus.ERROR, origin_fpath, exc
+        return CopyStatus.ERROR, origin_fpath, None, exc
 
 def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Optional[int] = None):
     """
@@ -220,15 +232,15 @@ def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Op
 
         with tqdm(total=len(tasks), desc="Copying files", unit="file") as pbar:
             for future in as_completed(tasks):
-                status, origin_fpath, exc = future.result()
+                status, origin_fpath, destin_fpath, exc = future.result()
                 if status == CopyStatus.SUCCESS:
-                    result.successful.append(origin_fpath)
+                    result.successful.append((origin_fpath, destin_fpath))
                 elif status == CopyStatus.EXISTING:
-                    result.existing.append(origin_fpath)
-                elif status == CopyStatus.SAME_NAME:
-                    result.same_name.append(origin_fpath)
+                    result.existing.append((origin_fpath, destin_fpath))
+                elif status == CopyStatus.RENAMED:
+                    result.renamed.append((origin_fpath, destin_fpath))
                 elif status == CopyStatus.ERROR:
-                    result.unsuccessful.append(origin_fpath)
+                    result.unsuccessful.append((origin_fpath, destin_fpath))
                     result.exceptions.add(exc)
                 pbar.update()
 

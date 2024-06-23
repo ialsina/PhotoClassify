@@ -10,8 +10,10 @@ from tqdm import tqdm
 
 try:
     from .config import config as cfg
+    from .utils import get_identifier_tuple
 except ImportError:
     from config import config as cfg
+    from utils import get_identifier_tuple
 
 class RelationPath(Path):
     def __init__(self, *args, **kwargs):
@@ -59,7 +61,9 @@ def _get_paths(
     return paths1, paths2
 
 def _same_name(path1: Path, path2: Path):
-    return path1.name == path2.name
+    _, clean_stem1, suffix1, _ = get_identifier_tuple(path1)
+    _, clean_stem2, suffix2, _ = get_identifier_tuple(path2)
+    return (clean_stem1, suffix1) == (clean_stem2, suffix2)
 
 def _same_size(path1: Path, path2: Path):
     return path1.stat().st_size == path2.stat().st_size
