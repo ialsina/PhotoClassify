@@ -1,12 +1,36 @@
+import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict
 from yaml import safe_load
 
-ROOT = Path(__file__).resolve().parent
-CONFIG_PATH = ROOT / "config.yaml"
-LAST_DATE_PATH = ROOT / ".lastdate"
+# Root directory
+ROOT = Path(__file__).resolve().parent.parent
+
+# Find App data path
+if os.name == "posix":
+    if os.uname().sysname == "Darwin":  # macOS-specific
+        APP_DATA_PATH = Path.home() / "Library" / "Application Support" / "photoclassify"
+    else:  # Linux and other Unix-like systems
+        APP_DATA_PATH = Path.home() / ".photoclassify"
+elif os.name == "nt":
+    APP_DATA_PATH = Path.home() / "AppData" / "Local" / "photoclassify"
+else:
+    raise OSError("Unknown Platform.")
+
+# Create App data path
+APP_DATA_PATH.mkdir(parents=True, exist_ok=True)
+
+# Config path, if in data path, take. Otherwise, the one in the repo.
+if (APP_DATA_PATH / "config.yaml").exists():
+    CONFIG_PATH = APP_DATA_PATH / "config.yaml"
+else:
+    CONFIG_PATH = ROOT / "config.yaml"
+
+# Last date path
+LAST_DATE_PATH = APP_DATA_PATH / ".lastdate"
+
 
 def read_date():
     with open(LAST_DATE_PATH, 'r', encoding="utf-8") as rf:

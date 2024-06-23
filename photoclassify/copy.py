@@ -7,7 +7,11 @@ import shutil
 from typing import Callable, Dict, List, Optional
 
 from tqdm import tqdm
-from config import config as cfg, write_date
+
+try:
+    from .config import config as cfg, write_date
+except ImportError:
+    from config import config as cfg, write_date
 
 
 @dataclass

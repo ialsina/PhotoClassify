@@ -7,7 +7,11 @@ from typing import Callable, Sequence, Optional
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from config import config as cfg
+
+try:
+    from .config import config as cfg
+except ImportError:
+    from config import config as cfg
 
 class RelationPath(Path):
     def __init__(self, *args, **kwargs):
