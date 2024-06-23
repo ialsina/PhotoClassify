@@ -52,7 +52,7 @@ class PathConfig:
     origin: Path
     destination: Path
     quarters: bool = False
-    safe: bool = True
+    safe: bool = False
 
     def _is_dir(self):
         for value in self.__dict__.values():
