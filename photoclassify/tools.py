@@ -15,21 +15,37 @@ def _get_parser() -> ArgumentParser:
     parser.add_argument("-F", "--no-include-first", action="store_false", dest="DATE.no_include_first")
     parser.add_argument("--remove", action="store_true", dest="COPY.remove_from_sd")
     parser.add_argument("--verbose", "-v", action="count", default=0, dest="COPY.verbose")
+    parser.add_argument("--no-parallel", "-P", action="store_false")
+    parser.add_argument("--max-workers", "-W", action="store", default=None)
     return parser
 
 def _parse_cli():
     cli_config = vars(_get_parser().parse_args(sys.argv[1:]))
     cli_config["DATE.include_first"] = not cli_config.pop("DATE.no_include_first")
-    return cli_config
+    parallel = not cli_config.pop("no_parallel")
+    max_workers = cli_config.pop("max_workers")
+    return cli_config, parallel, max_workers
 
-cfg = get_config(**_parse_cli())
+_cli_config, PARALLEL, MAX_WORKERS = _parse_cli()
+cfg = get_config(**_cli_config)
 
 def copy():
-    copy_photographs(cfg)
+    copy_photographs(cfg, parallel=PARALLEL, max_workers=MAX_WORKERS)
     return 0
 
 def diff():
-    _, without_copy = find_files_with_copy(cfg.path.origin, cfg.path.destination, ret_without=True)
-    print("Don't have a copy:")
-    for path in without_copy:
-        print(path)
+    origin = cfg.path.origin
+    destination = cfg.path.destination
+    _, without_copy = find_files_with_copy(
+        origin=origin,
+        destination=destination,
+        parallel=PARALLEL,
+        max_workers=MAX_WORKERS,
+        ret_without=True,
+    )
+    if without_copy:
+        print("Don't have a copy:")
+        for path in without_copy:
+            print(path)
+    else:
+        print(f"All elements in '{origin}' have a copy in '{destination}'.")

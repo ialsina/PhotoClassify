@@ -221,7 +221,7 @@ def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Op
         exceptions=sorted(exceptions, key=str)
     )
 
-def copy_photographs(cfg):
+def copy_photographs(cfg, parallel: bool = True, max_workers: Optional[int] = None):
     """
     Copies photographs according to the provided configuration.
 
@@ -248,7 +248,7 @@ def copy_photographs(cfg):
             f'\t           TO: {str(cfg.path.destination):<30s}\n'
             f'\tSTARTING DATE: {cfg.date.first_date.strftime(r"%d-%m-%Y"):<30s}'
         )
-    copy_result = _copy_imgdates(image_dates, cfg)
+    copy_result = _copy_imgdates(image_dates, cfg, parallel=parallel, max_workers=max_workers)
     copy_result.report(verbose=cfg.copy.verbose)
     if cfg.date.auto_date:
         write_date()
