@@ -1,18 +1,27 @@
 #!/usr/bin/python3
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import defaultdict
 import shutil
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Set, Optional
+from enum import Enum
 
 from tqdm import tqdm
 
 try:
     from .config import get_config, write_date, Config
+    from .diff import compare_files
 except ImportError:
     from config import get_config, write_date, Config
+    from diff import compare_files
 
+
+class CopyStatus(Enum):
+    SUCCESS = 1
+    EXISTING = 2
+    SAME_NAME = 3
+    ERROR = 4
 
 @dataclass
 class CopyResult:
@@ -27,16 +36,20 @@ class CopyResult:
         A list of successfully copied file paths.
     existing : List[str]
         A list of file paths that already existed in the destination.
+    same_name : List[str]
+        A list of file paths that didn't exist in the destination, but that
+        weren't copied because that would have produced a name collision.
     unsuccessful : List[str]
         A list of file paths that failed to copy.
     exceptions : List[Exception]
         A list of exceptions encountered during copying.
     """
     total: Dict[str, str]
-    successful: List[str]
-    existing: List[str]
-    unsuccessful: List[str]
-    exceptions: List[Exception]
+    successful: List[str] = field(default_factory=list)
+    existing: List[str] = field(default_factory=list)
+    same_name: List[str] = field(default_factory=list)
+    unsuccessful: List[str] = field(default_factory=list)
+    exceptions: Set[Exception] = field(default_factory=set)
 
     def report(
         self,
@@ -64,15 +77,20 @@ class CopyResult:
                 stdout('***')
                 stdout(f'Existing files: {len(self.existing)} out of {total_len}')
         if verbose >= 3:
-            stdout('\n\t'.join(self.existing))
+            stdout('\n\t'.join(str(p) for p in self.existing))
+        if verbose >= 2:
+            if len(self.same_name) > 0:
+                stdout('***')
+                stdout(f'Same name files (different but colliding name, not copied): {len(self.same_name)} out of {total_len}')
+                stdout('\n\t'.join(str(p) for p in self.same_name))
         if verbose >= 2:
             if len(self.unsuccessful) > 0:
                 stdout('***')
                 stdout(f'Unsuccessful copies: {len(self.unsuccessful)} out of {total_len}')
-                stdout('\n\t'.join(self.unsuccessful))
+                stdout('\n\t'.join(str(p) for p in self.unsuccessful))
         if verbose >= 3:
             stdout('> Errors encountered:')
-            stdout('\n\t'.join([str(e) for e in self.exceptions]))
+            stdout('\n\t'.join(str(e) for e in self.exceptions))
         stdout('***')
 
 def _get_target_path(datestamp: str, cfg: Config):
@@ -160,10 +178,12 @@ def _copy_file_task(origin_fpath, destin_path):
         destin_fpath = destin_path / origin_fpath.name
         if not destin_fpath.exists():
             shutil.copy2(origin_fpath, destin_path)
-            return 'success', origin_fpath, None
-        return 'existing', origin_fpath, None
+            return CopyStatus.SUCCESS, origin_fpath, None
+        if compare_files(origin_fpath, destin_fpath):
+            return CopyStatus.EXISTING, origin_fpath, None
+        return CopyStatus.SAME_NAME, origin_fpath, None
     except (FileNotFoundError, PermissionError, OSError) as exc:
-        return 'error', origin_fpath, exc
+        return CopyStatus.ERROR, origin_fpath, exc
 
 def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Optional[int] = None):
     """
@@ -181,10 +201,6 @@ def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Op
     CopyResult
         A dataclass containing the results of the copy operation.
     """
-    successful = []
-    existing = []
-    unsuccessful = []
-    exceptions = set()
 
     # KEYS: origin_filepath. VALUES: date
     imgdates2 = {
@@ -192,6 +208,7 @@ def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Op
         for date, origin_fpaths in imgdates.items()
         for origin_fpath in origin_fpaths
     }
+    result = CopyResult(total=imgdates2)
 
     tasks = []
     # values of imgdates are lists
@@ -203,23 +220,19 @@ def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Op
 
         with tqdm(total=len(tasks), desc="Copying files", unit="file") as pbar:
             for future in as_completed(tasks):
-                result, origin_fpath, exc = future.result()
-                if result == "success":
-                    successful.append(origin_fpath)
-                elif result == "existing":
-                    existing.append(origin_fpath)
-                elif result == "error":
-                    unsuccessful.append(origin_fpath)
-                    exceptions.add(exc)
+                status, origin_fpath, exc = future.result()
+                if status == CopyStatus.SUCCESS:
+                    result.successful.append(origin_fpath)
+                elif status == CopyStatus.EXISTING:
+                    result.existing.append(origin_fpath)
+                elif status == CopyStatus.SAME_NAME:
+                    result.same_name.append(origin_fpath)
+                elif status == CopyStatus.ERROR:
+                    result.unsuccessful.append(origin_fpath)
+                    result.exceptions.add(exc)
                 pbar.update()
 
-    return CopyResult(
-        total=imgdates2,
-        successful=successful,
-        existing=existing,
-        unsuccessful=unsuccessful,
-        exceptions=sorted(exceptions, key=str)
-    )
+    return result
 
 def copy_photographs(cfg, parallel: bool = True, max_workers: Optional[int] = None):
     """
