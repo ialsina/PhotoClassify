@@ -220,15 +220,16 @@ def copy(imgdates, max_workers: Optional[int] = None):
         exceptions=sorted(exceptions, key=str)
     )
 
+
 if __name__ == "__main__":
     _, image_dates = get_filepaths()
     create_directories(image_dates)
     if cfg.copy.verbose >= 1:
         print(
             'Copying files:\n'
-            f'\t         FROM: {cfg.path.origin:<30s}\n'
-            f'\t           TO: {cfg.path.destination:<30s}\n'
-            f'\tSTARTING DATE: {cfg.date.first_date:<30s}'
+            f'\t         FROM: {str(cfg.path.origin):<30s}\n'
+            f'\t           TO: {str(cfg.path.destination):<30s}\n'
+            f'\tSTARTING DATE: {cfg.date.first_date.strftime(r"%d-%m-%Y"):<30s}'
         )
     copy_result = copy(image_dates)
     copy_result.report(verbose=cfg.copy.verbose)
