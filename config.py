@@ -50,7 +50,7 @@ class PathConfig:
 
 @dataclass
 class DateConfig:
-    day_starts_at: timedelta
+    day_starts_at: dict
     process_after: datetime
     auto_date: bool = False
     include_first: bool = True
@@ -70,8 +70,16 @@ class DateConfig:
     def parse(cls, dct):
         day_starts_at = dct.pop("day_starts_at", 0)
         process_after = dct.pop("process_after", "01-01-1000")
+        if not isinstance(day_starts_at, (int, float)):
+            raise TypeError(
+                f"day_starts_at must be of type int or float, not {type(day_starts_at)}."
+            )
+        if not 0 <= day_starts_at < 12:
+            raise TypeError(
+                f"day_starts_at must be greater than 0, and lower than 12 (was {day_starts_at})."
+            )
         return cls(
-            day_starts_at=timedelta(hours=day_starts_at),
+            day_starts_at=day_starts_at,
             process_after=datetime.strptime(process_after, r"%d-%m-%Y"),
             **dct
         )

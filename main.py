@@ -121,7 +121,7 @@ def get_filepaths(first_date: Optional[datetime] = None):
     imgdates = defaultdict(list)
     for imgpath in imgpaths:
         dt = datetime.fromtimestamp(imgpath.stat().st_ctime)
-        modified_dt = dt - cfg.date.day_starts_at
+        modified_dt = dt - timedelta(hours=cfg.date.day_starts_at)
         # Pictures too old to classify (ideally already classified)
         if modified_dt < first_date:
             continue
