@@ -1,9 +1,12 @@
-import os
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict
+import os
 from yaml import safe_load
+
+from flatten_dict import flatten, unflatten
 
 # Root directory
 ROOT = Path(__file__).resolve().parent.parent
@@ -140,7 +143,15 @@ class Config:
             dct_out[subconfig_key] = subconfig_instance
         return cls(**dct_out)
 
-        
+def get_config(**kwargs):
+    with open(CONFIG_PATH, "r", encoding="utf-8") as cf:
+        config = safe_load(cf)
+    if kwargs:
+        config_f = flatten(config, reducer="dot")
+        for key, value in kwargs.items():
+            if value is not None:
+                config_f[key] = value
+        config = unflatten(config_f, splitter="dot")
+    return Config.parse(config)
 
-with open(CONFIG_PATH, "r", encoding="utf-8") as cf:
-    config = Config.parse(safe_load(cf))
+config = get_config()

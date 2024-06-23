@@ -9,9 +9,9 @@ from typing import Callable, Dict, List, Optional
 from tqdm import tqdm
 
 try:
-    from .config import config as cfg, write_date
+    from .config import get_config, write_date, Config
 except ImportError:
-    from config import config as cfg, write_date
+    from config import get_config, write_date, Config
 
 
 @dataclass
@@ -75,7 +75,7 @@ class CopyResult:
             stdout('\n\t'.join([str(e) for e in self.exceptions]))
         stdout('***')
 
-def _get_target_path(datestamp: str):
+def _get_target_path(datestamp: str, cfg: Config):
     """
     Get the target path for a given datestamp.
 
@@ -83,6 +83,8 @@ def _get_target_path(datestamp: str):
     ----------
     datestamp : str
         The datestamp string in 'YYYYMMDD' format.
+    cfg : Config
+        The config object
 
     Returns
     -------
@@ -96,7 +98,7 @@ def _get_target_path(datestamp: str):
     return cfg.path.destination / quarter / datestamp
 
 
-def get_filepaths(first_date: Optional[datetime] = None):
+def get_filepaths(cfg: Config):
     """
     Retrieves image file paths from the origin directory,
     classifies them by creation date, and stores them in a dictionary.
@@ -115,8 +117,7 @@ def get_filepaths(first_date: Optional[datetime] = None):
             - imgdates: A dictionary where keys are dates (as strings in 'YYYYMMDD' format)
                 and values are lists of image file paths.
     """
-    if first_date is None:
-        first_date = cfg.date.first_date
+    first_date = cfg.date.first_date
     imgpaths = []
     for root, _, files in cfg.path.origin.walk():
         for file in files:
@@ -134,7 +135,7 @@ def get_filepaths(first_date: Optional[datetime] = None):
     return imgpaths, imgdates
 
 
-def create_directories(imgdates):
+def _create_directories(imgdates: Dict[str, List[str]], cfg: Config):
     """
     Creates directories for each date key in the imgdates dictionary.
 
@@ -149,7 +150,7 @@ def create_directories(imgdates):
         If a directory cannot be created.
     """
     for datestamp in imgdates.keys():
-        target_path = _get_target_path(datestamp)
+        target_path = _get_target_path(datestamp, cfg)
         target_path.mkdir(parents=True, exist_ok=True)
 
 
@@ -164,7 +165,7 @@ def _copy_file_task(origin_fpath, destin_path):
     except (FileNotFoundError, PermissionError, OSError) as exc:
         return 'error', origin_fpath, exc
 
-def copy(imgdates, max_workers: Optional[int] = None):
+def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Optional[int] = None):
     """
     Copies image files to a destination path organized by date.
 
@@ -194,9 +195,9 @@ def copy(imgdates, max_workers: Optional[int] = None):
 
     tasks = []
     # values of imgdates are lists
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    with ProcessPoolExecutor(max_workers=(max_workers if parallel else 1)) as executor:
         for origin_fpath, datestamp in imgdates2.items():
-            destin_path = _get_target_path(datestamp)
+            destin_path = _get_target_path(datestamp, cfg)
             task = executor.submit(_copy_file_task, origin_fpath, destin_path)
             tasks.append(task)
 
@@ -220,10 +221,26 @@ def copy(imgdates, max_workers: Optional[int] = None):
         exceptions=sorted(exceptions, key=str)
     )
 
+def copy_photographs(cfg):
+    """
+    Copies photographs according to the provided configuration.
 
-if __name__ == "__main__":
-    _, image_dates = get_filepaths()
-    create_directories(image_dates)
+    Parameters
+    ----------
+    cfg : Config
+        Configuration object
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    FileNotFoundError
+        If any required directories or files are not found.
+    """
+    _, image_dates = get_filepaths(cfg)
+    _create_directories(image_dates, cfg)
     if cfg.copy.verbose >= 1:
         print(
             'Copying files:\n'
@@ -231,7 +248,11 @@ if __name__ == "__main__":
             f'\t           TO: {str(cfg.path.destination):<30s}\n'
             f'\tSTARTING DATE: {cfg.date.first_date.strftime(r"%d-%m-%Y"):<30s}'
         )
-    copy_result = copy(image_dates)
+    copy_result = _copy_imgdates(image_dates, cfg)
     copy_result.report(verbose=cfg.copy.verbose)
     if cfg.date.auto_date:
         write_date()
+
+
+if __name__ == "__main__":
+    copy_photographs(get_config())

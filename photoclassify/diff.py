@@ -143,7 +143,7 @@ def calculate_file_hash(filepath: Path) -> str:
             sha256.update(chunk)
     return sha256.hexdigest()
 
-def find_files_with_copy(origin: Path, destination: Path, parallel=True, max_workers=None):
+def find_files_with_copy(origin: Path, destination: Path, parallel=True, max_workers=None, ret_without=False):
     """
  Find files in the origin directory that have identical copies in the destination directory.
 
@@ -167,7 +167,10 @@ def find_files_with_copy(origin: Path, destination: Path, parallel=True, max_wor
     _find_add_candidates(paths_origin, paths_destination, _same_name, _same_size)
     _add_twins_parallel(paths_origin, max_workers=(max_workers if parallel else 1))
     paths_origin_with_copy = [Path(p) for p in paths_origin if any(p.twins)]
-    return paths_origin_with_copy 
+    if not ret_without:
+        return paths_origin_with_copy 
+    paths_origin_without_copy = [path for path in paths_origin if path not in paths_origin_with_copy]
+    return paths_origin_with_copy, paths_origin_without_copy
 
 def find_files_without_copy(origin: Path, destination: Path, parallel=True, max_workers=None):
     """
