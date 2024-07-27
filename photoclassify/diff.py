@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import hashlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Sequence, Optional
 
@@ -20,19 +21,19 @@ class RelationPath(Path):
         super().__init__(*args, **kwargs)
         self._candidates = []
         self._twins = []
-    
+
     @property
     def candidates(self):
         return self._candidates
-    
+
     @candidates.setter
     def candidates(self, value):
         self._candidates = value
-    
+
     @property
     def twins(self):
         return self._twins
-    
+
     @twins.setter
     def twins(self, value):
         self._twins = value
@@ -94,7 +95,10 @@ def _find_add_candidates(
             candidates.append(dest_path)
         fpath.candidates = candidates
 
-def _add_twins_parallel(paths1: Sequence[RelationPath], max_workers: Optional[int] = None) -> None:
+def _add_twins_parallel(
+    paths1: Sequence[RelationPath],
+    max_workers: Optional[int] = None
+) -> None:
     """
     Find and add twin files using parallel processing.
 
@@ -131,6 +135,7 @@ def compare_files(file1: Path, file2: Path) -> bool:
     return calculate_file_hash(file1) == calculate_file_hash(file2)
 
 
+@lru_cache(maxsize=None)
 def calculate_file_hash(filepath: Path) -> str:
     """
     Calculate the SHA256 hash of a file.
@@ -147,9 +152,15 @@ def calculate_file_hash(filepath: Path) -> str:
             sha256.update(chunk)
     return sha256.hexdigest()
 
-def find_files_with_copy(origin: Path, destination: Path, parallel=True, max_workers=None, ret_without=False):
+def find_files_with_copy(
+        origin: Path,
+        destination: Path,
+        parallel=True,
+        max_workers=None,
+        ret_without=False
+    ):
     """
- Find files in the origin directory that have identical copies in the destination directory.
+    Find files in the origin directory that have identical copies in the destination directory.
 
     Parameters
     ----------
@@ -172,7 +183,7 @@ def find_files_with_copy(origin: Path, destination: Path, parallel=True, max_wor
     _add_twins_parallel(paths_origin, max_workers=(max_workers if parallel else 1))
     paths_origin_with_copy = [Path(p) for p in paths_origin if any(p.twins)]
     if not ret_without:
-        return paths_origin_with_copy 
+        return paths_origin_with_copy
     paths_origin_without_copy = [path for path in paths_origin if path not in paths_origin_with_copy]
     return paths_origin_with_copy, paths_origin_without_copy
 
