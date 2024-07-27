@@ -2,7 +2,7 @@ import sys
 from argparse import ArgumentParser, RawTextHelpFormatter
 
 from photoclassify.config import get_config
-from photoclassify.copy import copy_photographs
+from photoclassify.copies import copy_photographs
 from photoclassify.diff import find_files_with_copy
 
 def _get_parser() -> ArgumentParser:
