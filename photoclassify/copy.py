@@ -9,14 +9,10 @@ from enum import Enum
 
 from tqdm import tqdm
 
-try:
-    from .config import get_config, write_date, Config
-    from .diff import compare_files
-    from .photopath import PhotoPath
-except ImportError:
-    from config import get_config, write_date, Config
-    from diff import compare_files
-    from photopath import PhotoPath
+from photoclassify.config import get_config, write_date, Config
+from photoclassify.diff import compare_files
+from photoclassify.photopath import PhotoPath
+
 
 MAX_RENAME_ALLOWED = 20
 

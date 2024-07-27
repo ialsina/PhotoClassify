@@ -9,12 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-try:
-    from .config import config as cfg
-    from .utils import PhotoPath
-except ImportError:
-    from config import config as cfg
-    from utils import PhotoPath
+from photoclassify.config import config as cfg
+from photoclassify.photopath import PhotoPath
 
 class RelationPath(Path):
     def __init__(self, *args, **kwargs):
