@@ -11,10 +11,10 @@ from tqdm import tqdm
 
 try:
     from .config import config as cfg
-    from .utils import get_identifier_tuple
+    from .utils import PhotoPath
 except ImportError:
     from config import config as cfg
-    from utils import get_identifier_tuple
+    from utils import PhotoPath
 
 class RelationPath(Path):
     def __init__(self, *args, **kwargs):
@@ -61,10 +61,6 @@ def _get_paths(
         print(f"Error while collecting paths: {exc}")
     return paths1, paths2
 
-def _same_name(path1: Path, path2: Path):
-    _, clean_stem1, suffix1, _ = get_identifier_tuple(path1)
-    _, clean_stem2, suffix2, _ = get_identifier_tuple(path2)
-    return (clean_stem1, suffix1) == (clean_stem2, suffix2)
 
 def _same_size(path1: Path, path2: Path):
     return path1.stat().st_size == path2.stat().st_size
@@ -179,7 +175,7 @@ def find_files_with_copy(
         List of Path objects representing files in the origin directory that have copies in the destination directory.
     """
     paths_origin, paths_destination = _get_paths(origin, destination)
-    _find_add_candidates(paths_origin, paths_destination, _same_name, _same_size)
+    _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
     _add_twins_parallel(paths_origin, max_workers=(max_workers if parallel else 1))
     paths_origin_with_copy = [Path(p) for p in paths_origin if any(p.twins)]
     if not ret_without:
@@ -281,7 +277,7 @@ def make_histogram(
         Whether to stack histograms, default is True.
     """
     paths_origin, paths_destination = _get_paths(origin, destination)
-    _find_add_candidates(paths_origin, paths_destination, _same_name, _same_size)
+    _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
     _add_twins_parallel(paths_origin)
     fig = _make_histogram(
         paths_origin,
@@ -296,10 +292,11 @@ def make_histogram(
 
 if __name__ == "__main__":
     paths_orig, paths_dest = _get_paths()
-    _find_add_candidates(paths_orig, paths_dest, _same_name, _same_size)
+    _find_add_candidates(paths_orig, paths_dest, PhotoPath.same_name, _same_size)
     _add_twins_parallel(paths_orig)
     _make_histogram(paths_orig, paths_dest, split_input=True, filter_output=True)
     with_candidates = [p for p in paths_orig if any(p.candidates)]
     without_candidates = [p for p in paths_orig if not any(p.candidates)]
     with_twins = [p for p in paths_orig if any(p.twins)]
     without_twins = [p for p in paths_orig if not any(p.twins)]
+

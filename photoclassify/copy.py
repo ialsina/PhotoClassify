@@ -12,11 +12,11 @@ from tqdm import tqdm
 try:
     from .config import get_config, write_date, Config
     from .diff import compare_files
-    from .utils import new_name
+    from .photopath import PhotoPath
 except ImportError:
     from config import get_config, write_date, Config
     from diff import compare_files
-    from utils import new_name
+    from photopath import PhotoPath
 
 MAX_RENAME_ALLOWED = 20
 
@@ -189,7 +189,7 @@ def _copy_file_task(origin_fpath, destin_path):
         if compare_files(origin_fpath, destin_fpath):
             return CopyStatus.EXISTING, origin_fpath, destin_fpath, None
         for _ in range(MAX_RENAME_ALLOWED):
-            destin_fpath = new_name(destin_fpath)
+            destin_fpath = PhotoPath.from_path(destin_fpath).next.path
             if not destin_fpath.exists():
                 shutil.copy2(origin_fpath, destin_fpath)
                 return CopyStatus.RENAMED, origin_fpath, destin_fpath, None
