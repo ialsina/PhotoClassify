@@ -4,6 +4,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Sequence, Optional
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,14 +36,22 @@ class RelationPath(Path):
         self._twins = value
 
 
-def _get_paths(
-    origin: Optional[Path] = None,
-    destination: Optional[Path] = None
-):
+def _ensure_paths(origin, destination):
     if origin is None:
         origin = cfg.path.origin
     if destination is None:
         destination = cfg.path.destination
+    if isinstance(origin, str):
+        origin = Path(origin)
+    if isinstance(destination, str):
+        destination = Path(destination)
+    return origin, destination
+
+def _get_paths(
+    origin: Optional[Path] = None,
+    destination: Optional[Path] = None
+):
+    origin, destination = _ensure_paths(origin, destination)
     paths1 = []
     paths2 = []
     print("Collecting paths...")
