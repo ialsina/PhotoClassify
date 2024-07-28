@@ -4,7 +4,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Sequence, Optional
-import os
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -96,9 +95,31 @@ def _find_add_candidates(
             candidates.append(dest_path)
         fpath.candidates = candidates
 
+def _add_twins(
+    paths1: Sequence[RelationPath],
+    fun_compare: Callable,
+    *args,
+    **kwargs,
+) -> None:
+    """
+    Find and add twin files using parallel processing.
+
+    Args:
+        paths1 (Sequence[RelationPath]): List of original file paths.
+        paths2 (Sequence[Path]): List of destination file paths.
+    """
+    print("Finding twins...")
+    for p1 in tqdm(paths1):
+        for p2 in p1.candidates:
+            if fun_compare(p1, p2, *args, **kwargs):
+                p1.twins.append(p2)
+
 def _add_twins_parallel(
     paths1: Sequence[RelationPath],
-    max_workers: Optional[int] = None
+    fun_compare: Callable,
+    *args,
+    max_workers: Optional[int] = None,
+    **kwargs,
 ) -> None:
     """
     Find and add twin files using parallel processing.
@@ -110,7 +131,7 @@ def _add_twins_parallel(
     print("Finding twins in parallel...")
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(compare_files, p1, p2): (p1, p2)
+            executor.submit(fun_compare, p1, p2, *args, **kwargs): (p1, p2)
             for p1
             in paths1
             for p2
@@ -122,7 +143,7 @@ def _add_twins_parallel(
                 p1.twins.append(p2)
 
 
-def compare_files(file1: Path, file2: Path) -> bool:
+def compare_hash(file1: Path, file2: Path) -> bool:
     """
     Compare two files by their SHA256 hash.
 
@@ -153,13 +174,42 @@ def calculate_file_hash(filepath: Path) -> str:
             sha256.update(chunk)
     return sha256.hexdigest()
 
+def compare_stream(file1: Path, file2: Path, chunk_size: int = 8192) -> bool:
+    """
+    Compare two files by streaming their contents and comparing chunks.
+
+    Args:
+        file1 (Path): The first file to compare.
+        file2 (Path): The second file to compare.
+        chunk_size (int): Size of the chunks to read from each file.
+
+    Returns:
+        bool: True if files are identical, False otherwise.
+    """
+    try:
+        with open(file1, "rb") as f1, open(file2, "rb") as f2:
+            while True:
+                chunk1 = f1.read(chunk_size)
+                chunk2 = f2.read(chunk_size)
+
+                if chunk1 != chunk2:
+                    return False
+
+                if not chunk1:  # End of both files
+                    return True
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        return False
+    except IOError as e:
+        print(f"Error reading files: {e}")
+        return False
+
 def find_files_with_copy(
         origin: Path,
         destination: Path,
         parallel=True,
         max_workers=None,
-        ret_without=False
-    ):
+    ) -> Sequence[Path]:
     """
     Find files in the origin directory that have identical copies in the destination directory.
 
@@ -181,14 +231,19 @@ def find_files_with_copy(
     """
     paths_origin, paths_destination = _get_paths(origin, destination)
     _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
-    _add_twins_parallel(paths_origin, max_workers=(max_workers if parallel else 1))
+    if parallel:
+        _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
+    else:
+        _add_twins(paths_origin, compare_stream)
     paths_origin_with_copy = [Path(p) for p in paths_origin if any(p.twins)]
-    if not ret_without:
-        return paths_origin_with_copy
-    paths_origin_without_copy = [path for path in paths_origin if path not in paths_origin_with_copy]
-    return paths_origin_with_copy, paths_origin_without_copy
+    return paths_origin_with_copy
 
-def find_files_without_copy(origin: Path, destination: Path, parallel=True, max_workers=None):
+def find_files_without_copy(
+        origin: Path,
+        destination: Path,
+        parallel=True,
+        max_workers=None,
+    ) -> Sequence[Path]:
     """
     Find files in the origin directory that do not have identical copies in the destination directory.
 
@@ -295,13 +350,27 @@ def make_histogram(
     fig.savefig(fname)
 
 
-if __name__ == "__main__":
-    paths_orig, paths_dest = _get_paths()
-    _find_add_candidates(paths_orig, paths_dest, PhotoPath.same_name, _same_size)
-    _add_twins_parallel(paths_orig)
-    _make_histogram(paths_orig, paths_dest, split_input=True, filter_output=True)
-    with_candidates = [p for p in paths_orig if any(p.candidates)]
-    without_candidates = [p for p in paths_orig if not any(p.candidates)]
-    with_twins = [p for p in paths_orig if any(p.twins)]
-    without_twins = [p for p in paths_orig if not any(p.twins)]
+def write(paths: Sequence[RelationPath], fname: str | Path, which: str = "both"):
+    def writelines(buffer, sequence):
+        buffer.writelines(f"{p}\n" for p in sequence)
+    def writesequence(buffer, sequence, name):
+        buffer.write(f"\n\n{name}:\n{'=' * (len(name) + 1)}\n")
+        writelines(buffer, sequence)
+
+    if which.lower() not in {"c", "b", "t", "candidates", "twins", "both"}:
+        raise ValueError(
+            "'which' must be one of: 'candidates', 'twins', 'both'."
+        )
+
+    with open(fname, "w", encoding="utf-8") as wf:
+        if which.lower() in {"c", "b", "candidates", "both"}:
+            with_candidates = [p for p in paths_orig if any(p.candidates)]
+            without_candidates = [p for p in paths_orig if not any(p.candidates)]
+            writesequence(wf, with_candidates, "With candidates")
+            writesequence(wf, without_candidates, "Without candidates")
+        if which.lower() in {"t", "b", "twins", "both"}:
+            with_twins = [p for p in paths_orig if any(p.twins)]
+            without_twins = [p for p in paths_orig if not any(p.twins)]
+            writesequence(wf, with_twins, "With twins")
+            writesequence(wf, without_twins, "Without twins")
 

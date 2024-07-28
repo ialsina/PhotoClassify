@@ -11,7 +11,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from photoclassify.config import get_config, write_date, Config
-from photoclassify.diff import compare_files
+from photoclassify.diff import compare_hash, compare_stream
 from photoclassify.photopath import PhotoPath
 
 
@@ -183,7 +183,7 @@ def _copy_file_task(origin_fpath, destin_path):
         if not destin_fpath.exists():
             shutil.copy2(origin_fpath, destin_path)
             return CopyStatus.SUCCESS, origin_fpath, destin_fpath, None
-        if compare_files(origin_fpath, destin_fpath):
+        if compare_hash(origin_fpath, destin_fpath):
             return CopyStatus.EXISTING, origin_fpath, destin_fpath, None
         for _ in range(MAX_RENAME_ALLOWED):
             destin_fpath = PhotoPath.from_path(destin_fpath).next.path
