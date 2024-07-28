@@ -10,8 +10,8 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "phcopy=photoclassify.tools:copy",
-            "phdiff=photoclassify.tools:diff",
+            "phcopy=photoclassify.entrypoints:copy",
+            "phdiff=photoclassify.entrypoints:diff",
         ]
     }
 )
