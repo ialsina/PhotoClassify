@@ -143,7 +143,9 @@ class Config:
             dct_out[subconfig_key] = subconfig_instance
         return cls(**dct_out)
 
-def get_config(**kwargs):
+def get_config(**kwargs) -> Config:
+    """Get config from config file, overridden by kwargs."""
+
     with open(CONFIG_PATH, "r", encoding="utf-8") as cf:
         config = safe_load(cf)
     if kwargs:

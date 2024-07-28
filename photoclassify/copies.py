@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import defaultdict
 import shutil
-from typing import Callable, Dict, List, Set, Optional
+from typing import Callable, Dict, List, Set, Optional, Tuple
 from enum import Enum
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -119,7 +120,7 @@ def _get_target_path(datestamp: str, cfg: Config):
     return cfg.path.destination / quarter / datestamp
 
 
-def get_filepaths(cfg: Config):
+def get_filepaths(cfg: Config) -> Tuple[List[Path], Dict[str, List[Path]]]:
     """
     Retrieves image file paths from the origin directory,
     classifies them by creation date, and stores them in a dictionary.
@@ -193,7 +194,12 @@ def _copy_file_task(origin_fpath, destin_path):
     except (FileNotFoundError, PermissionError, OSError) as exc:
         return CopyStatus.ERROR, origin_fpath, None, exc
 
-def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Optional[int] = None):
+def _copy_imgdates(
+    imgdates: Dict[str, List[Path]],
+    cfg: Config,
+    parallel: bool = True,
+    max_workers: Optional[int] = None
+):
     """
     Copies image files to a destination path organized by date.
 
@@ -211,7 +217,7 @@ def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Op
     """
 
     # KEYS: origin_filepath. VALUES: date
-    imgdates2 = {
+    imgdates2: Dict[Path, str] = {
         origin_fpath: date
         for date, origin_fpaths in imgdates.items()
         for origin_fpath in origin_fpaths
@@ -242,7 +248,12 @@ def _copy_imgdates(imgdates, cfg: Config, parallel: bool = True, max_workers: Op
 
     return result
 
-def copy_photographs(cfg, parallel: bool = True, max_workers: Optional[int] = None):
+def copy_photographs(
+    cfg: Config,
+    parallel: bool = True,
+    max_workers: Optional[int] = None,
+    stdout: Optional[Callable] = None
+) -> None:
     """
     Copies photographs according to the provided configuration.
 
@@ -262,8 +273,10 @@ def copy_photographs(cfg, parallel: bool = True, max_workers: Optional[int] = No
     """
     _, image_dates = get_filepaths(cfg)
     _create_directories(image_dates, cfg)
+    if stdout is None:
+        stdout = print
     if cfg.copy.verbose >= 1:
-        print(
+        stdout(
             'Copying files:\n'
             f'\t         FROM: {str(cfg.path.origin):<30s}\n'
             f'\t           TO: {str(cfg.path.destination):<30s}\n'
