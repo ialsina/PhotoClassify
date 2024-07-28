@@ -357,9 +357,19 @@ def make_histogram(
     return fig
 
 
-def _write(paths: Sequence[RelationPath], fname: str | Path, which: str = "both"):
+def _write(
+    paths: Sequence[RelationPath],
+    fname: str | Path,
+    which: str = "both",
+    line_numbers: bool = False,
+):
     def writelines(buffer, sequence):
-        buffer.writelines(f"{p}\n" for p in sequence)
+        if line_numbers:
+            buffer.writelines(
+                f"{i:>4d}. {p}\n" for i, p in enumerate(sequence, start=1)
+            )
+        else:
+            buffer.writelines(f"{p}\n" for p in sequence)
     def writesequence(buffer, sequence, name):
         buffer.write(f"\n\n{name}:\n{'=' * (len(name) + 1)}\n")
         writelines(buffer, sequence)
@@ -395,5 +405,5 @@ def report(
         _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
     else:
         _add_twins(paths_origin, compare_stream)
-    _write(paths_origin, fname, which=which)
+    _write(paths_origin, fname, which=which, line_numbers=True)
 
