@@ -4,7 +4,10 @@ import sys
 
 from photoclassify.config import get_config
 from photoclassify.copies import copy_photographs
-from photoclassify.diff import find_files_without_copy
+from photoclassify.diff import (
+    find_files_without_copy,
+    make_histogram,
+)
 
 def _get_base_parser() -> ArgumentParser:
     parser = ArgumentParser(add_help=True, formatter_class=RawTextHelpFormatter)
@@ -23,6 +26,14 @@ def _get_copy_parser() -> ArgumentParser:
     parser.add_argument("-H", "--day-starts-at", action="store", type=int, default=None, metavar="DAY_STARTS_AT", dest="DATE.day_starts_at")
     parser.add_argument("-a", "--process-after", action="store", type=str, default=None, metavar="PROCESS_AFTER", dest="DATE.process_after")
     parser.add_argument("-F", "--no-include-first", action="store_false", dest="DATE.no_include_first")
+    return parser
+
+def _get_hist_parser() -> ArgumentParser:
+    parser = _get_base_parser()
+    parser.set_defaults(output="histogram.png")
+    parser.add_argument("-b", "--nbins", action="store", metavar="BINS", type=int, default=100)
+    parser.add_argument("-S", "--no-split-input", action="store_false")
+    parser.add_argument("-F", "--no-filter-output", action="store_false")
     return parser
 
 def _get_clean_config(cli_config):
@@ -77,3 +88,24 @@ def diff():
     if output:
         wf.close()  # type: ignore
     return 0
+
+def hist():
+    cli_config = vars(_get_hist_parser().parse_args(sys.argv[1:]))
+    parallel, max_workers, output = _get_clean_config(cli_config)
+    nbins = cli_config.pop("nbins")
+    split_input = not cli_config.pop("no_split_input")
+    filter_output = not cli_config.pop("no_filter_output")
+    cfg = get_config(**cli_config)
+    origin = cfg.path.origin
+    destination = cfg.path.destination
+    make_histogram(
+        origin=origin,
+        destination=destination,
+        fname=output,
+        parallel=parallel,
+        max_workers=max_workers,
+        nbins=nbins,
+        split_input=split_input,
+        filter_output=filter_output,
+        stacked=True
+    )

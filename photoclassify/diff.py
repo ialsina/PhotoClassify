@@ -296,7 +296,7 @@ def _make_histogram(
     if split_input:
         _add_hist(ax[0], [input_twins, input_no_twins], label=["Twins", "No-twins"])
     else:
-        _add_hist(ax[0], [input_twins + input_no_twins], label=[""])
+        _add_hist(ax[0], [paths1], label=[""])
     if filter_output:
         _add_hist(ax[1], [output_twins], label="")
     else:
@@ -310,11 +310,13 @@ def _make_histogram(
 def make_histogram(
     origin: Path,
     destination: Path,
-    fname: str | Path,
-    nbins=100,
-    split_input=True,
-    filter_output=True,
-    stacked=True,
+    fname: Optional[str | Path] = None,
+    parallel: bool = True,
+    max_workers: Optional[int] = None,
+    nbins: int = 100,
+    split_input: bool = True,
+    filter_output: bool = True,
+    stacked: bool = True,
 ):
     """
     Create and save histograms of file sizes for files in the origin and destination directories.
@@ -338,7 +340,10 @@ def make_histogram(
     """
     paths_origin, paths_destination = _get_paths(origin, destination)
     _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
-    _add_twins_parallel(paths_origin)
+    if parallel:
+        _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
+    else:
+        _add_twins(paths_origin, compare_stream)
     fig = _make_histogram(
         paths_origin,
         paths_destination,
@@ -347,7 +352,9 @@ def make_histogram(
         filter_output=filter_output,
         stacked=stacked,
     )
-    fig.savefig(fname)
+    if fname:
+        fig.savefig(fname)
+    return fig
 
 
 def write(paths: Sequence[RelationPath], fname: str | Path, which: str = "both"):

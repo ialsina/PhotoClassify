@@ -12,6 +12,7 @@ setup(
         "console_scripts": [
             "phcopy=photoclassify.entrypoints:copy",
             "phdiff=photoclassify.entrypoints:diff",
+            "phhist=photoclassify.entrypoints:hist",
         ]
     }
 )
