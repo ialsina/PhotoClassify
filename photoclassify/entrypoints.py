@@ -14,7 +14,7 @@ def _get_base_parser() -> ArgumentParser:
     parser.add_argument("PATH.origin", action="store", metavar="ORIGIN", default=None)
     parser.add_argument("PATH.destination", action="store", metavar="DESTINATION", default=None)
     parser.add_argument("-o", "--output", action="store", metavar="OUTPUT", default=None)
-    parser.add_argument("--no-parallel", "-P", action="store_false")
+    parser.add_argument("--no-parallel", "-P", action="store_true")
     parser.add_argument("--max-workers", "-W", action="store", default=None)
     return parser
 
@@ -25,15 +25,15 @@ def _get_copy_parser() -> ArgumentParser:
     parser.add_argument("-q", "--quarters", action="store_true", dest="PATH.quarters")
     parser.add_argument("-H", "--day-starts-at", action="store", type=int, default=None, metavar="DAY_STARTS_AT", dest="DATE.day_starts_at")
     parser.add_argument("-a", "--process-after", action="store", type=str, default=None, metavar="PROCESS_AFTER", dest="DATE.process_after")
-    parser.add_argument("-F", "--no-include-first", action="store_false", dest="DATE.no_include_first")
+    parser.add_argument("-F", "--no-include-first", action="store_true", dest="DATE.no_include_first")
     return parser
 
 def _get_hist_parser() -> ArgumentParser:
     parser = _get_base_parser()
     parser.set_defaults(output="histogram.png")
     parser.add_argument("-b", "--nbins", action="store", metavar="BINS", type=int, default=100)
-    parser.add_argument("-S", "--no-split-input", action="store_false")
-    parser.add_argument("-F", "--no-filter-output", action="store_false")
+    parser.add_argument("-S", "--no-split-input", action="store_true")
+    parser.add_argument("-F", "--no-filter-output", action="store_true")
     return parser
 
 def _get_clean_config(cli_config):
