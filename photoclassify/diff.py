@@ -371,13 +371,13 @@ def write(paths: Sequence[RelationPath], fname: str | Path, which: str = "both")
 
     with open(fname, "w", encoding="utf-8") as wf:
         if which.lower() in {"c", "b", "candidates", "both"}:
-            with_candidates = [p for p in paths_orig if any(p.candidates)]
-            without_candidates = [p for p in paths_orig if not any(p.candidates)]
+            with_candidates = [p for p in paths if any(p.candidates)]
+            without_candidates = [p for p in paths if not any(p.candidates)]
             writesequence(wf, with_candidates, "With candidates")
             writesequence(wf, without_candidates, "Without candidates")
         if which.lower() in {"t", "b", "twins", "both"}:
-            with_twins = [p for p in paths_orig if any(p.twins)]
-            without_twins = [p for p in paths_orig if not any(p.twins)]
+            with_twins = [p for p in paths if any(p.twins)]
+            without_twins = [p for p in paths if not any(p.twins)]
             writesequence(wf, with_twins, "With twins")
             writesequence(wf, without_twins, "Without twins")
 
