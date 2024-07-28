@@ -357,7 +357,7 @@ def make_histogram(
     return fig
 
 
-def write(paths: Sequence[RelationPath], fname: str | Path, which: str = "both"):
+def _write(paths: Sequence[RelationPath], fname: str | Path, which: str = "both"):
     def writelines(buffer, sequence):
         buffer.writelines(f"{p}\n" for p in sequence)
     def writesequence(buffer, sequence, name):
@@ -380,4 +380,20 @@ def write(paths: Sequence[RelationPath], fname: str | Path, which: str = "both")
             without_twins = [p for p in paths if not any(p.twins)]
             writesequence(wf, with_twins, "With twins")
             writesequence(wf, without_twins, "Without twins")
+
+def report(
+    origin: Path,
+    destination: Path,
+    fname: str | Path,
+    which: str = "both",
+    parallel=True,
+    max_workers=None,
+) -> None:
+    paths_origin, paths_destination = _get_paths(origin, destination)
+    _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
+    if parallel:
+        _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
+    else:
+        _add_twins(paths_origin, compare_stream)
+    _write(paths_origin, fname, which=which)
 

@@ -5,8 +5,10 @@ import sys
 from photoclassify.config import get_config
 from photoclassify.copies import copy_photographs
 from photoclassify.diff import (
+    find_files_with_copy,
     find_files_without_copy,
     make_histogram,
+    report,
 )
 
 def _get_base_parser() -> ArgumentParser:
@@ -16,6 +18,17 @@ def _get_base_parser() -> ArgumentParser:
     parser.add_argument("-o", "--output", action="store", metavar="OUTPUT", default=None)
     parser.add_argument("--no-parallel", "-P", action="store_true")
     parser.add_argument("--max-workers", "-W", action="store", default=None)
+    return parser
+
+def _get_diff_parser() -> ArgumentParser:
+    parser = _get_base_parser()
+    parser.add_argument(
+        "-t", "--type",
+        action="store",
+        choices=["candidates", "twins", "both"],
+        default="both",
+        metavar="TYPE",
+    )
     return parser
 
 def _get_copy_parser() -> ArgumentParser:
@@ -62,31 +75,28 @@ def copy():
     return 0
 
 def diff():
-    cli_config = vars(_get_base_parser().parse_args(sys.argv[1:]))
+    cli_config = vars(_get_diff_parser().parse_args(sys.argv[1:]))
     parallel, max_workers, output = _get_clean_config(cli_config)
+    which = cli_config.pop("type")
     cfg = get_config(**cli_config)
     origin = cfg.path.origin
     destination = cfg.path.destination
-    without_copy = find_files_without_copy(
-        origin=origin,
-        destination=destination,
-        parallel=parallel,
-        max_workers=max_workers,
-    )
-    if output:
-        wf = open(output, "w", encoding="utf-8")
-        stdout = lambda txt: wf.write(f"{txt}\n")
+    if output is None:
+        without_copy = find_files_without_copy(
+            origin=origin,
+            destination=destination,
+            parallel=parallel,
+            max_workers=max_workers,
+        )
     else:
-        stdout = print
-    if without_copy:
-        stdout("Don't have a copy:")
-        for path in without_copy:
-            stdout(path)
-    else:
-        stdout(f"All elements in '{origin}' have a copy in '{destination}'.")
-
-    if output:
-        wf.close()  # type: ignore
+        report(
+            origin=origin,
+            destination=destination,
+            fname=output,
+            which=which,
+            parallel=parallel,
+            max_workers=max_workers,
+        )
     return 0
 
 def hist():
