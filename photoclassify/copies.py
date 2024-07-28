@@ -30,7 +30,7 @@ class CopyResult:
 
     Attributes
     ----------
-    total : Dict[str, str]
+    dates : Dict[Path, str]
         A dictionary where keys are origin file paths and values are dates.
     successful : List[Tuple[str, str]]
         A list of successfully copied file paths.
@@ -44,11 +44,11 @@ class CopyResult:
     exceptions : List[Exception]
         A list of exceptions encountered during copying.
     """
-    total: Dict[str, str]
-    successful: List[str] = field(default_factory=list)
-    existing: List[str] = field(default_factory=list)
-    renamed: List[str] = field(default_factory=list)
-    unsuccessful: List[str] = field(default_factory=list)
+    dates: Dict[str, str]
+    successful: List[Tuple[str, str]] = field(default_factory=list)
+    existing: List[Tuple[str, str]] = field(default_factory=list)
+    renamed: List[Tuple[str, str]] = field(default_factory=list)
+    unsuccessful: List[Tuple[str, str]] = field(default_factory=list)
     exceptions: Set[Exception] = field(default_factory=set)
 
     @staticmethod
@@ -217,12 +217,12 @@ def _copy_imgdates(
     """
 
     # KEYS: origin_filepath. VALUES: date
-    imgdates2: Dict[Path, str] = {
-        origin_fpath: date
+    imgdates2: Dict[str, str] = {
+        str(origin_fpath): date
         for date, origin_fpaths in imgdates.items()
         for origin_fpath in origin_fpaths
     }
-    result = CopyResult(total=imgdates2)
+    result = CopyResult(dates=imgdates2)
 
     tasks = []
     # values of imgdates are lists
