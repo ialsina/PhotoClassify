@@ -88,6 +88,8 @@ def _find_add_candidates(
     for fpath in tqdm(paths1, leave=False):
         candidates = []
         dest_path = files_dest.get(fpath.name)
+        print(f"P1 -- {str(fpath):>80s} -- {fpath.stat().st_size}")
+        print(f"   -- {str(dest_path):>80s} -- {dest_path.stat().st_size}")
         if dest_path and all(fun(fpath, dest_path) for fun in funs):
             candidates.append(dest_path)
         fpath.candidates = candidates
