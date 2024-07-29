@@ -428,3 +428,24 @@ def report(
         _add_twins(paths_origin, compare_stream)
     _write(paths_origin, fname, which=which, line_numbers=True, level_two=level_two)
 
+
+if __name__ == "__main__":
+    import sys
+    try:
+        origin, destination, fname = sys.argv[1:]
+    except ValueError:
+        print(
+            "Please, call using 'python3 diff.py <ORIGIN> <DESTINATION> <FNAME>'."
+        )
+        sys.exit(1)
+
+    report(
+        origin=Path(origin),
+        destination=Path(destination),
+        fname=Path(fname),
+        which="both",
+        parallel=False,
+        max_workers=None,
+        level_two=True,
+    )
+
