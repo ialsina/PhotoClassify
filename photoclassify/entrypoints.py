@@ -29,6 +29,10 @@ def _get_diff_parser() -> ArgumentParser:
         default="both",
         metavar="TYPE",
     )
+    parser.add_argument(
+        "-1", "--level-one",
+        action="store_true",
+    )
     return parser
 
 def _get_copy_parser() -> ArgumentParser:
@@ -78,6 +82,7 @@ def diff():
     cli_config = vars(_get_diff_parser().parse_args(sys.argv[1:]))
     parallel, max_workers, output = _get_clean_config(cli_config)
     which = cli_config.pop("type")
+    level_two = not cli_config.pop("level_one")
     cfg = get_config(**cli_config)
     origin = cfg.path.origin
     destination = cfg.path.destination
@@ -96,6 +101,7 @@ def diff():
             which=which,
             parallel=parallel,
             max_workers=max_workers,
+            level_two=level_two,
         )
     return 0
 

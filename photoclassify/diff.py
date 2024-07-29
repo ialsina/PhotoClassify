@@ -54,15 +54,12 @@ def _get_paths(
     paths1 = []
     paths2 = []
     print("Collecting paths...")
-    try:
-        for root, _, files in origin.walk():
-            for file in files:
-                paths1.append(RelationPath(root / file))
-        for root, _, files in destination.walk():
-            for file in files:
-                paths2.append(root / file)
-    except Exception as exc: # pylint: disable=W0718
-        print(f"Error while collecting paths: {exc}")
+    for root, _, files in origin.walk():
+        for file in files:
+            paths1.append(RelationPath(root / file))
+    for root, _, files in destination.walk():
+        for file in files:
+            paths2.append(root / file)
     return paths1, paths2
 
 
@@ -362,17 +359,34 @@ def _write(
     fname: str | Path,
     which: str = "both",
     line_numbers: bool = False,
+    level_two: bool = False,
 ):
-    def writelines(buffer, sequence):
+    def get_line(number, path, l2):
+        main_line = (
+            f"\t{number:>4d}. {path}"
+            if number
+            else "\t" + path
+        )
+        secondary_lines = (
+            "\n" + "\n".join(f"\t\t\t\t- {el}" for el in getattr(path, l2))
+            if l2
+            else ""
+        )
+        return main_line + secondary_lines + "\n"
+
+    def writelines(buffer, sequence, l2):
         if line_numbers:
             buffer.writelines(
-                f"{i:>4d}. {p}\n" for i, p in enumerate(sequence, start=1)
+                get_line(i, path, l2) for i, path in enumerate(sequence, start=1)
             )
         else:
-            buffer.writelines(f"{p}\n" for p in sequence)
-    def writesequence(buffer, sequence, name):
+            buffer.writelines(
+                get_line(None, path, l2) for path in sequence
+            )
+
+    def writesequence(buffer, sequence, name, l2):
         buffer.write(f"\n\n{name}:\n{'=' * (len(name) + 1)}\n")
-        writelines(buffer, sequence)
+        writelines(buffer, sequence, l2)
 
     if which.lower() not in {"c", "b", "t", "candidates", "twins", "both"}:
         raise ValueError(
@@ -383,13 +397,19 @@ def _write(
         if which.lower() in {"c", "b", "candidates", "both"}:
             with_candidates = [p for p in paths if any(p.candidates)]
             without_candidates = [p for p in paths if not any(p.candidates)]
-            writesequence(wf, with_candidates, "With candidates")
-            writesequence(wf, without_candidates, "Without candidates")
+            writesequence(
+                wf, with_candidates, "With candidates",
+                "candidates" if level_two else None
+            )
+            writesequence(wf, without_candidates, "Without candidates", None)
         if which.lower() in {"t", "b", "twins", "both"}:
             with_twins = [p for p in paths if any(p.twins)]
             without_twins = [p for p in paths if not any(p.twins)]
-            writesequence(wf, with_twins, "With twins")
-            writesequence(wf, without_twins, "Without twins")
+            writesequence(
+                wf, with_twins, "With twins",
+                "twins" if level_two else None
+            )
+            writesequence(wf, without_twins, "Without twins", None)
 
 def report(
     origin: Path,
@@ -397,6 +417,7 @@ def report(
     fname: str | Path,
     which: str = "both",
     parallel=True,
+    level_two: bool = False,
     max_workers=None,
 ) -> None:
     paths_origin, paths_destination = _get_paths(origin, destination)
@@ -405,5 +426,5 @@ def report(
         _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
     else:
         _add_twins(paths_origin, compare_stream)
-    _write(paths_origin, fname, which=which, line_numbers=True)
+    _write(paths_origin, fname, which=which, line_numbers=True, level_two=level_two)
 
