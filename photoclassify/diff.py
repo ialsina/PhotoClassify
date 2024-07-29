@@ -12,28 +12,6 @@ from tqdm import tqdm
 from photoclassify.config import config as cfg
 from photoclassify.photopath import PhotoPath
 
-class RelationPath(Path):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._candidates = []
-        self._twins = []
-
-    @property
-    def candidates(self):
-        return self._candidates
-
-    @candidates.setter
-    def candidates(self, value):
-        self._candidates = value
-
-    @property
-    def twins(self):
-        return self._twins
-
-    @twins.setter
-    def twins(self, value):
-        self._twins = value
-
 
 def _ensure_paths(origin, destination):
     if origin is None:
@@ -56,7 +34,7 @@ def _get_paths(
     print("Collecting paths...")
     for root, _, files in origin.walk():
         for file in files:
-            paths1.append(RelationPath(root / file))
+            paths1.append(root / file)
     for root, _, files in destination.walk():
         for file in files:
             paths2.append(root / file)
@@ -70,7 +48,7 @@ def _same_ctime(path1: Path, path2: Path):
     return path1.stat().st_ctime == path2.stat().st_ctime
 
 def _find_add_candidates(
-    paths1: Sequence[RelationPath],
+    paths1: Sequence[Path],
     paths2: Sequence[Path],
     *funs: Callable[[Path, Path], bool]
 ) -> None:
@@ -78,7 +56,7 @@ def _find_add_candidates(
     Find and add candidate files from the destination paths that match the original paths based on specified criteria.
 
     Args:
-        paths1 (Sequence[RelationPath]): List of original file paths.
+        paths1 (Sequence[Path]): List of original file paths.
         paths2 (Sequence[Path]): List of destination file paths.
         *funs (Callable[[Path, Path], bool]): Functions to determine if a file in the destination is a candidate.
     """
@@ -88,12 +66,14 @@ def _find_add_candidates(
     for fpath in tqdm(paths1, leave=False):
         candidates = []
         dest_path = files_dest.get(fpath.name)
+        print("P1 --", fpath)
+        print("   -----", dest_path)
         if dest_path and all(fun(fpath, dest_path) for fun in funs):
             candidates.append(dest_path)
         fpath.candidates = candidates
 
 def _add_twins(
-    paths1: Sequence[RelationPath],
+    paths1: Sequence[Path],
     fun_compare: Callable,
     *args,
     **kwargs,
@@ -102,7 +82,7 @@ def _add_twins(
     Find and add twin files using parallel processing.
 
     Args:
-        paths1 (Sequence[RelationPath]): List of original file paths.
+        paths1 (Sequence[Path]): List of original file paths.
         paths2 (Sequence[Path]): List of destination file paths.
     """
     print("Finding twins...")
@@ -112,7 +92,7 @@ def _add_twins(
                 p1.twins.append(p2)
 
 def _add_twins_parallel(
-    paths1: Sequence[RelationPath],
+    paths1: Sequence[Path],
     fun_compare: Callable,
     *args,
     max_workers: Optional[int] = None,
@@ -122,7 +102,7 @@ def _add_twins_parallel(
     Find and add twin files using parallel processing.
 
     Args:
-        paths1 (Sequence[RelationPath]): List of original file paths.
+        paths1 (Sequence[Path]): List of original file paths.
         paths2 (Sequence[Path]): List of destination file paths.
     """
     print("Finding twins in parallel...")
@@ -355,7 +335,7 @@ def make_histogram(
 
 
 def _write(
-    paths: Sequence[RelationPath],
+    paths: Sequence[Path],
     fname: str | Path,
     which: str = "both",
     line_numbers: bool = False,
