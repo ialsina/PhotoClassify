@@ -11,7 +11,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from photoclassify.config import get_config, write_date, Config
-from photoclassify.diff import compare_hash, compare_stream
+from photoclassify.diff import compare_stream
 from photoclassify.photopath import PhotoPath
 
 
@@ -44,7 +44,7 @@ class CopyResult:
     exceptions : List[Exception]
         A list of exceptions encountered during copying.
     """
-    dates: Dict[str, str]
+    dates: Dict[Path, str]
     successful: List[Tuple[str, str]] = field(default_factory=list)
     existing: List[Tuple[str, str]] = field(default_factory=list)
     renamed: List[Tuple[str, str]] = field(default_factory=list)
@@ -73,7 +73,7 @@ class CopyResult:
         stdout : Callable, optional
             Function to use for printing the report (default is `print`).
         """
-        total_len = len(self.total)
+        total_len = len(self.dates)
         stdout('Copy terminated')
         if verbose >= 2:
             stdout(f'Successful copies: {len(self.successful)} out of {total_len}')
@@ -120,7 +120,7 @@ def _get_target_path(datestamp: str, cfg: Config):
     return cfg.path.destination / quarter / datestamp
 
 
-def get_filepaths(cfg: Config) -> Tuple[List[Path], Dict[str, List[Path]]]:
+def get_filepaths(cfg: Config) -> Tuple[List[Path], Dict[str, List[Path]], Dict[Path, str]]:
     """
     Retrieves image file paths from the origin directory,
     classifies them by creation date, and stores them in a dictionary.
@@ -154,10 +154,16 @@ def get_filepaths(cfg: Config) -> Tuple[List[Path], Dict[str, List[Path]]]:
             continue
         datestamp = modified_dt.strftime(r"%Y%m%d")
         imgdates[datestamp].append(imgpath)
-    return imgpaths, imgdates
+
+    imgdates_flat = {
+        origin_fpath: date
+        for date, origin_fpaths in imgdates.items()
+        for origin_fpath in origin_fpaths
+    }
+    return imgpaths, dict(imgdates), imgdates_flat
 
 
-def _create_directories(imgdates: Dict[str, List[str]], cfg: Config):
+def _create_directories(dates: List[str], cfg: Config):
     """
     Creates directories for each date key in the imgdates dictionary.
 
@@ -171,10 +177,16 @@ def _create_directories(imgdates: Dict[str, List[str]], cfg: Config):
     FileNotFoundError
         If a directory cannot be created.
     """
-    for datestamp in imgdates.keys():
-        target_path = _get_target_path(datestamp, cfg)
+    if not (
+        isinstance(dates, list)
+        and all(isinstance(element, str) for element in dates)
+    ):
+        raise TypeError(
+            "dates should be of type List[str]."
+        )
+    for date in dates:
+        target_path = _get_target_path(date, cfg)
         target_path.mkdir(parents=True, exist_ok=True)
-
 
 def _copy_file_task(origin_fpath, destin_path):
     """Helper function for copy"""
@@ -183,7 +195,7 @@ def _copy_file_task(origin_fpath, destin_path):
         if not destin_fpath.exists():
             shutil.copy2(origin_fpath, destin_path)
             return CopyStatus.SUCCESS, origin_fpath, destin_fpath, None
-        if compare_hash(origin_fpath, destin_fpath):
+        if compare_stream(origin_fpath, destin_fpath):
             return CopyStatus.EXISTING, origin_fpath, destin_fpath, None
         for _ in range(MAX_RENAME_ALLOWED):
             destin_fpath = PhotoPath.from_path(destin_fpath).next.path
@@ -195,10 +207,8 @@ def _copy_file_task(origin_fpath, destin_path):
         return CopyStatus.ERROR, origin_fpath, None, exc
 
 def _copy_imgdates(
-    imgdates: Dict[str, List[Path]],
+    imgdates: Dict[Path, str],
     cfg: Config,
-    parallel: bool = True,
-    max_workers: Optional[int] = None
 ):
     """
     Copies image files to a destination path organized by date.
@@ -206,7 +216,49 @@ def _copy_imgdates(
     Parameters
     ----------
     imgdates : Dict[str, List[Path]]
-        A dictionary where keys are dates and values are lists of origin file paths.
+        A dictionary where values are dates and keys are file paths.
+    max_workers : int, optional
+        The maximum number of worker processes to use. Defaults to the number of processors on the machine.
+
+    Returns
+    -------
+    CopyResult
+        A dataclass containing the results of the copy operation.
+    """
+
+    result = CopyResult(dates=imgdates)
+
+    tasks = []
+    # values of imgdates are lists
+    with tqdm(total=len(tasks), desc="Copying files", unit="file") as pbar:
+        for origin_fpath, datestamp in imgdates.items():
+            destin_fpath = _get_target_path(datestamp, cfg)
+            status, origin_fpath, destin_fpath, exc = _copy_file_task(origin_fpath, destin_fpath)
+            if status == CopyStatus.SUCCESS:
+                result.successful.append((origin_fpath, destin_fpath))
+            elif status == CopyStatus.EXISTING:
+                result.existing.append((origin_fpath, destin_fpath))
+            elif status == CopyStatus.RENAMED:
+                result.renamed.append((origin_fpath, destin_fpath))
+            elif status == CopyStatus.ERROR:
+                result.unsuccessful.append((origin_fpath, destin_fpath))
+                result.exceptions.add(exc)
+            pbar.update()
+
+    return result
+
+def _copy_imgdates_parallel(
+    imgdates: Dict[Path, str],
+    cfg: Config,
+    max_workers: Optional[int] = None
+):
+    """
+    Copies image files to a destination path organized by date.
+
+    Parameters
+    ----------
+    imgdates : Dict[Path, ]
+        A dictionary where values are dates and keys are file paths.
     max_workers : int, optional
         The maximum number of worker processes to use. Defaults to the number of processors on the machine.
 
@@ -217,19 +269,14 @@ def _copy_imgdates(
     """
 
     # KEYS: origin_filepath. VALUES: date
-    imgdates2: Dict[str, str] = {
-        str(origin_fpath): date
-        for date, origin_fpaths in imgdates.items()
-        for origin_fpath in origin_fpaths
-    }
-    result = CopyResult(dates=imgdates2)
+    result = CopyResult(dates=imgdates)
 
     tasks = []
     # values of imgdates are lists
-    with ProcessPoolExecutor(max_workers=(max_workers if parallel else 1)) as executor:
-        for origin_fpath, datestamp in imgdates2.items():
-            destin_path = _get_target_path(datestamp, cfg)
-            task = executor.submit(_copy_file_task, origin_fpath, destin_path)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        for origin_fpath, datestamp in imgdates.items():
+            destin_fpath = _get_target_path(datestamp, cfg)
+            task = executor.submit(_copy_file_task, origin_fpath, destin_fpath)
             tasks.append(task)
 
         with tqdm(total=len(tasks), desc="Copying files", unit="file") as pbar:
@@ -271,8 +318,8 @@ def copy_photographs(
     FileNotFoundError
         If any required directories or files are not found.
     """
-    _, image_dates = get_filepaths(cfg)
-    _create_directories(image_dates, cfg)
+    _, dates, date_paths = get_filepaths(cfg)
+    _create_directories(list(dates), cfg)
     if stdout is None:
         stdout = print
     if cfg.copy.verbose >= 1:
@@ -282,7 +329,10 @@ def copy_photographs(
             f'\t           TO: {str(cfg.path.destination):<30s}\n'
             f'\tSTARTING DATE: {cfg.date.first_date.strftime(r"%d-%m-%Y"):<30s}'
         )
-    copy_result = _copy_imgdates(image_dates, cfg, parallel=parallel, max_workers=max_workers)
+    if parallel:
+        copy_result = _copy_imgdates_parallel(date_paths, cfg, max_workers=max_workers)
+    else:
+        copy_result = _copy_imgdates(date_paths, cfg)
     copy_result.report(verbose=cfg.copy.verbose)
     if cfg.date.auto_date:
         write_date()
@@ -290,3 +340,4 @@ def copy_photographs(
 
 if __name__ == "__main__":
     copy_photographs(get_config())
+
