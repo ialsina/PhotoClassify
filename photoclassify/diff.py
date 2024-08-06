@@ -6,7 +6,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import lru_cache
 import os
 from pathlib import Path
-from typing import Callable, Sequence, Mapping, Optional, cast
+from typing import Callable, Sequence, Mapping, Optional, Tuple
 
 from matplotlib import defaultParams
 import numpy as np
