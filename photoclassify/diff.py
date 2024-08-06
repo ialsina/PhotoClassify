@@ -1,39 +1,20 @@
 #!/usr/bin/python3
+
 import hashlib
+from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import lru_cache
 import os
 from pathlib import Path
-from typing import Callable, Sequence, Optional
+from typing import Callable, Sequence, Mapping, Optional, cast
 
+from matplotlib import defaultParams
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from photoclassify.config import config as cfg
 from photoclassify.photopath import PhotoPath
-
-class RelationPath(Path):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._candidates = []
-        self._twins = []
-
-    @property
-    def candidates(self):
-        return self._candidates
-
-    @candidates.setter
-    def candidates(self, value):
-        self._candidates = value
-
-    @property
-    def twins(self):
-        return self._twins
-
-    @twins.setter
-    def twins(self, value):
-        self._twins = value
 
 
 def _ensure_paths(origin, destination):
@@ -50,7 +31,7 @@ def _ensure_paths(origin, destination):
 def _get_paths(
     origin: Optional[Path] = None,
     destination: Optional[Path] = None
-):
+) -> Tuple[Sequence[Path], Sequence[Path]]:
     origin, destination = _ensure_paths(origin, destination)
     paths1 = []
     paths2 = []
@@ -69,77 +50,6 @@ def _same_size(path1: Path, path2: Path):
 
 def _same_ctime(path1: Path, path2: Path):
     return path1.stat().st_ctime == path2.stat().st_ctime
-
-def _find_add_candidates(
-    paths1: Sequence[RelationPath],
-    paths2: Sequence[Path],
-    *funs: Callable[[Path, Path], bool]
-) -> None:
-    """
-    Find and add candidate files from the destination paths that match the original paths based on specified criteria.
-
-    Args:
-        paths1 (Sequence[RelationPath]): List of original file paths.
-        paths2 (Sequence[Path]): List of destination file paths.
-        *funs (Callable[[Path, Path], bool]): Functions to determine if a file in the destination is a candidate.
-    """
-    files_dest = {fpath.name: fpath for fpath in paths2}
-    print("Finding candidates...")
-
-    for fpath in tqdm(paths1, leave=False):
-        candidates = []
-        dest_path = files_dest.get(fpath.name)
-        if dest_path and all(fun(fpath, dest_path) for fun in funs):
-            candidates.append(dest_path)
-        fpath.candidates = candidates
-
-def _add_twins(
-    paths1: Sequence[RelationPath],
-    fun_compare: Callable,
-    *args,
-    **kwargs,
-) -> None:
-    """
-    Find and add twin files using parallel processing.
-
-    Args:
-        paths1 (Sequence[RelationPath]): List of original file paths.
-        paths2 (Sequence[Path]): List of destination file paths.
-    """
-    print("Finding twins...")
-    for p1 in tqdm(paths1):
-        for p2 in p1.candidates:
-            if fun_compare(p1, p2, *args, **kwargs):
-                p1.twins.append(p2)
-
-def _add_twins_parallel(
-    paths1: Sequence[RelationPath],
-    fun_compare: Callable,
-    *args,
-    max_workers: Optional[int] = None,
-    **kwargs,
-) -> None:
-    """
-    Find and add twin files using parallel processing.
-
-    Args:
-        paths1 (Sequence[RelationPath]): List of original file paths.
-        paths2 (Sequence[Path]): List of destination file paths.
-    """
-    print("Finding twins in parallel...")
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(fun_compare, p1, p2, *args, **kwargs): (p1, p2)
-            for p1
-            in paths1
-            for p2
-            in p1.candidates
-        }
-        for future in tqdm(as_completed(futures), total=len(futures), leave=False):
-            p1, p2 = futures[future]
-            if future.result():
-                p1.twins.append(p2)
-
 
 def compare_hash(file1: Path, file2: Path) -> bool:
     """
@@ -202,6 +112,105 @@ def compare_stream(file1: Path, file2: Path, chunk_size: int = 8192) -> bool:
         print(f"Error reading files: {e}")
         return False
 
+FUN_FILTER = [
+    PhotoPath.same_name,
+    _same_size,
+]
+FUN_COMPARE = compare_stream
+
+def find_candidates(
+    paths1: Sequence[Path],
+    paths2: Sequence[Path],
+    *funs: Sequence[Callable[[Path, Path], bool]],
+) -> Mapping[Path, Sequence[Path]]:
+    """
+    Find and add candidate files from the destination paths that match the original paths based on specified criteria.
+
+    Args:
+        paths1 (Sequence[Path]): List of original file paths.
+        paths2 (Sequence[Path]): List of destination file paths.
+        *funs (Callable[[Path, Path], bool]): Functions to determine if a file in the destination is a candidate.
+    """
+    files_dest = {fpath.name: fpath for fpath in paths2}
+    candidates = defaultdict(list)
+    for orig_path in tqdm(paths1, leave=False):
+        dest_path = files_dest.get(orig_path.name)
+        if dest_path and all(fun(orig_path, dest_path) for fun in funs):
+            candidates[orig_path].append(dest_path)
+
+    return dict(candidates)
+
+def find_twins(
+    paths1: Sequence[Path],
+    paths2: Sequence[Path],
+    fun_filter: Callable | Sequence[Callable] | None,
+    fun_compare: Callable,
+    *args,
+    **kwargs,
+) -> Mapping[Path, Sequence[Path]]:
+    """
+    Find and add twin files using parallel processing.
+
+    Args:
+        paths1 (Sequence[Path]): List of original file paths.
+        paths2 (Sequence[Path]): List of destination file paths.
+    """
+    if fun_filter is not None:
+        print("Finding candidates...")
+        candidates = find_candidates(paths1, paths2, *FUN_FILTER)
+    else:
+        candidates = {p1: paths2 for p1 in paths1}
+    print("Finding twins...")
+
+    twins = defaultdict(list)
+    for p1 in tqdm(paths1):
+        for p2 in candidates:
+            if fun_compare(p1, p2, *args, **kwargs):
+                twins[p1].append(p2)
+
+    return dict(twins)
+
+def find_twins_parallel(
+    paths1: Sequence[Path],
+    paths2: Sequence[Path],
+    fun_filter: Callable | Sequence[Callable] | None,
+    fun_compare: Callable,
+    *args,
+    max_workers: Optional[int] = None,
+    **kwargs,
+) -> Mapping[Path, Sequence[Path]]:
+    """
+    Find and add twin files using parallel processing.
+
+    Args:
+        paths1 (Sequence[Path]): List of original file paths.
+        paths2 (Sequence[Path]): List of destination file paths.
+    """
+    if fun_filter is not None:
+        print("Finding candidates...")
+        candidates = find_candidates(paths1, paths2, *FUN_FILTER)
+    else:
+        candidates = {p1: paths2 for p1 in paths1}
+
+    print("Finding twins in parallel...")
+
+    twins = defaultdict(list)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(fun_compare, p1, p2, *args, **kwargs): (p1, p2)
+            for p1
+            in paths1
+            for p2
+            in candidates[p1]
+        }
+        for future in tqdm(as_completed(futures), total=len(futures), leave=False):
+            if future.result():
+                p1, p2 = futures[future]
+                twins[p1].append(p2)
+
+    return dict(twins)
+
+
 def find_files_with_copy(
         origin: Path,
         destination: Path,
@@ -228,11 +237,10 @@ def find_files_with_copy(
         List of Path objects representing files in the origin directory that have copies in the destination directory.
     """
     paths_origin, paths_destination = _get_paths(origin, destination)
-    _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
     if parallel:
-        _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
+        find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
     else:
-        _add_twins(paths_origin, compare_stream)
+        find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
     paths_origin_with_copy = [Path(p) for p in paths_origin if any(p.twins)]
     return paths_origin_with_copy
 
@@ -270,6 +278,7 @@ def find_files_without_copy(
 def _make_histogram(
     paths1,
     paths2,
+    twins: Mapping[Path, Sequence[Path]],
     nbins=100,
     split_input=True,
     filter_output=True,
@@ -287,9 +296,13 @@ def _make_histogram(
             stacked=stacked,
         )
     fig, ax = plt.subplots(2, sharex=True)
-    input_twins = [p for p in paths1 if p.twins]
+    input_twins = [p for p in paths1 if twins.get(p, [])]
     input_no_twins = [p for p in paths1 if p not in input_twins]
-    output_twins = [p for p in paths2 if any(p in po.twins for po in paths1)]
+    # EQUIVALENT:
+    # output_twins = [p for p in paths2 if any(
+    #     p in twins.get(po, []) for po in paths1
+    # )]
+    output_twins = [p for p in paths2 if any(p in lst for lst in twins.values())]
     output_no_twins = [p for p in paths2 if p not in output_twins]
     if split_input:
         _add_hist(ax[0], [input_twins, input_no_twins], label=["Twins", "No-twins"])
@@ -337,14 +350,14 @@ def make_histogram(
         Whether to stack histograms, default is True.
     """
     paths_origin, paths_destination = _get_paths(origin, destination)
-    _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
     if parallel:
-        _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
+        twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
     else:
-        _add_twins(paths_origin, compare_stream)
+        twins = find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
     fig = _make_histogram(
         paths_origin,
         paths_destination,
+        twins=twins,
         nbins=nbins,
         split_input=split_input,
         filter_output=filter_output,
@@ -355,10 +368,9 @@ def make_histogram(
     return fig
 
 
-def _write(
-    paths: Sequence[RelationPath],
+def _write_twins(
+    twins: Mapping[Path, Sequence[Path]],
     fname: str | Path,
-    which: str = "both",
     line_numbers: bool = False,
     level_two: bool = False,
 ):
@@ -389,28 +401,14 @@ def _write(
         buffer.write(f"\n\n{name}:\n{'=' * (len(name) + 1)}\n")
         writelines(buffer, sequence, l2)
 
-    if which.lower() not in {"c", "b", "t", "candidates", "twins", "both"}:
-        raise ValueError(
-            "'which' must be one of: 'candidates', 'twins', 'both'."
-        )
-
     with open(fname, "w", encoding="utf-8") as wf:
-        if which.lower() in {"c", "b", "candidates", "both"}:
-            with_candidates = [p for p in paths if any(p.candidates)]
-            without_candidates = [p for p in paths if not any(p.candidates)]
-            writesequence(
-                wf, with_candidates, "With candidates",
-                "candidates" if level_two else None
-            )
-            writesequence(wf, without_candidates, "Without candidates", None)
-        if which.lower() in {"t", "b", "twins", "both"}:
-            with_twins = [p for p in paths if any(p.twins)]
-            without_twins = [p for p in paths if not any(p.twins)]
-            writesequence(
-                wf, with_twins, "With twins",
-                "twins" if level_two else None
-            )
-            writesequence(wf, without_twins, "Without twins", None)
+        with_twins = [path for path, lst in twins.items() if lst]
+        without_twins = [path for path, lst in twins.items() if not lst]
+        writesequence(
+            wf, with_twins, "With twins",
+            "twins" if level_two else None
+        )
+        writesequence(wf, without_twins, "Without twins", None)
 
 def report(
     origin: Path,
@@ -421,13 +419,23 @@ def report(
     level_two: bool = False,
     max_workers=None,
 ) -> None:
+
+    if which.lower() not in {"c", "b", "t", "candidates", "twins", "both"}:
+        raise ValueError(
+            "'which' must be one of: 'candidates', 'twins', 'both'."
+        )
+
     paths_origin, paths_destination = _get_paths(origin, destination)
-    _find_add_candidates(paths_origin, paths_destination, PhotoPath.same_name, _same_size)
-    if parallel:
-        _add_twins_parallel(paths_origin, compare_stream, max_workers=max_workers)
-    else:
-        _add_twins(paths_origin, compare_stream)
-    _write(paths_origin, fname, which=which, line_numbers=True, level_two=level_two)
+
+    if which.lower() in {"c", "b", "candidates", "both"}:
+        candidates = find_candidates(paths_origin, paths_destination, FUN_FILTER)
+        _write_twins(candidates, fname, line_numbers=True, level_two=level_two)
+    if which.lower() in {"t", "b", "twins", "both"}:
+        if parallel:
+            twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
+        else:
+            twins = find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
+        _write_twins(twins, fname, line_numbers=True, level_two=level_two)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,51 @@
+
+
+With candidates:
+================
+	   1. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1078.NEF
+				- /home/ivan/pCloudDrive/PhotoUpload/104ND610/DSC_1078.NEF
+
+
+Without candidates:
+===================
+	   1. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1070.NEF
+	   2. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1071.NEF
+	   3. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1072.NEF
+	   4. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1073.NEF
+	   5. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1074.NEF
+	   6. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1075.NEF
+	   7. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1076.NEF
+	   8. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1077.NEF
+	   9. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1065.NEF
+	  10. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_0931.NEF
+	  11. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_0937.NEF
+	  12. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1029.NEF
+	  13. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1066.NEF
+	  14. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1067.NEF
+	  15. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1068.NEF
+	  16. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1069.NEF
+
+
+With twins:
+===========
+
+
+Without twins:
+==============
+	   1. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1070.NEF
+	   2. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1071.NEF
+	   3. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1072.NEF
+	   4. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1073.NEF
+	   5. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1074.NEF
+	   6. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1075.NEF
+	   7. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1076.NEF
+	   8. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1077.NEF
+	   9. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1065.NEF
+	  10. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_0931.NEF
+	  11. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_0937.NEF
+	  12. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1029.NEF
+	  13. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1066.NEF
+	  14. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1067.NEF
+	  15. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1068.NEF
+	  16. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1069.NEF
+	  17. /home/ivan/pCloudDrive/Photographs_test_28jul/20220306/DSC_1078.NEF
