@@ -1,11 +1,12 @@
 #!/usr/bin/python3
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from collections import defaultdict
+from enum import Enum
+import os
 import shutil
 from typing import Callable, Dict, List, Set, Optional, Tuple
-from enum import Enum
 from pathlib import Path
 
 from tqdm import tqdm
@@ -141,9 +142,9 @@ def get_filepaths(cfg: Config) -> Tuple[List[Path], Dict[str, List[Path]], Dict[
     """
     first_date = cfg.date.first_date
     imgpaths = []
-    for root, _, files in cfg.path.origin.walk():
+    for root, _, files in os.walk(cfg.path.origin):
         for file in files:
-            imgpaths.append(root / file)
+            imgpaths.append(Path(root) / file)
 
     imgdates = defaultdict(list)
     for imgpath in imgpaths:

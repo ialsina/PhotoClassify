@@ -2,6 +2,7 @@
 import hashlib
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Callable, Sequence, Optional
 
@@ -54,12 +55,12 @@ def _get_paths(
     paths1 = []
     paths2 = []
     print("Collecting paths...")
-    for root, _, files in origin.walk():
+    for root, _, files in os.walk(origin):
         for file in files:
-            paths1.append(RelationPath(root / file))
-    for root, _, files in destination.walk():
+            paths1.append(Path(root) / file)
+    for root, _, files in os.walk(destination):
         for file in files:
-            paths2.append(root / file)
+            paths2.append(Path(root) / file)
     return paths1, paths2
 
 
