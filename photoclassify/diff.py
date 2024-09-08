@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 from typing import Callable, Sequence, Mapping, Optional, Tuple
 
-from matplotlib import defaultParams
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -195,6 +194,7 @@ def find_twins_parallel(
     print("Finding twins in parallel...")
 
     twins = defaultdict(list)
+    # BUG: Gives KeyError
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(fun_compare, p1, p2, *args, **kwargs): (p1, p2)
@@ -238,10 +238,10 @@ def find_files_with_copy(
     """
     paths_origin, paths_destination = _get_paths(origin, destination)
     if parallel:
-        find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
+        twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
     else:
-        find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
-    paths_origin_with_copy = [Path(p) for p in paths_origin if any(p.twins)]
+        twins = find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
+    paths_origin_with_copy = [Path(p) for p in paths_origin if twins.get(p, [])]
     return paths_origin_with_copy
 
 def find_files_without_copy(
