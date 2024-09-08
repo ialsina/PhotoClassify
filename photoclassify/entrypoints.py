@@ -1,11 +1,10 @@
 from argparse import ArgumentParser, RawTextHelpFormatter
-from functools import partial
+from pprint import pprint
 import sys
 
 from photoclassify.config import get_config
 from photoclassify.copies import copy_photographs
 from photoclassify.diff import (
-    find_files_with_copy,
     find_files_without_copy,
     make_histogram,
     report,
@@ -53,7 +52,9 @@ def _get_hist_parser() -> ArgumentParser:
     parser.add_argument("-F", "--no-filter-output", action="store_true")
     return parser
 
-def _get_clean_config(cli_config):
+def _clean_cli_config(cli_config):
+    """Separate parallel, max_workers and output from config dictionary."""
+
     parallel = not cli_config.pop("no_parallel")
     max_workers = cli_config.pop("max_workers")
     output = cli_config.pop("output")
@@ -61,7 +62,7 @@ def _get_clean_config(cli_config):
 
 def copy():
     cli_config = vars(_get_copy_parser().parse_args(sys.argv[1:]))
-    parallel, max_workers, output = _get_clean_config(cli_config)
+    parallel, max_workers, output = _clean_cli_config(cli_config)
     cli_config["DATE.include_first"] = not cli_config.pop("DATE.no_include_first")
     cfg = get_config(**cli_config)
     if output:
@@ -70,33 +71,32 @@ def copy():
     else:
         stdout = print
     copy_photographs(cfg,
-                        parallel=parallel,
-                        max_workers=max_workers,
-                        stdout=stdout
-                        )
+                     parallel=parallel,
+                     max_workers=max_workers,
+                     stdout=stdout
+                     )
     if output:
         wf.close()  # type: ignore
     return 0
 
 def diff():
     cli_config = vars(_get_diff_parser().parse_args(sys.argv[1:]))
-    parallel, max_workers, output = _get_clean_config(cli_config)
+    parallel, max_workers, output = _clean_cli_config(cli_config)
     which = cli_config.pop("type")
     level_two = not cli_config.pop("level_one")
     cfg = get_config(**cli_config)
-    origin = cfg.path.origin
-    destination = cfg.path.destination
     if output is None:
         without_copy = find_files_without_copy(
-            origin=origin,
-            destination=destination,
+            origin=cfg.path.origin,
+            destination=cfg.path.destination,
             parallel=parallel,
             max_workers=max_workers,
         )
+        pprint(without_copy)
     else:
         report(
-            origin=origin,
-            destination=destination,
+            origin=cfg.path.origin,
+            destination=cfg.path.destination,
             fname=output,
             which=which,
             parallel=parallel,
@@ -107,16 +107,14 @@ def diff():
 
 def hist():
     cli_config = vars(_get_hist_parser().parse_args(sys.argv[1:]))
-    parallel, max_workers, output = _get_clean_config(cli_config)
+    parallel, max_workers, output = _clean_cli_config(cli_config)
     nbins = cli_config.pop("nbins")
     split_input = not cli_config.pop("no_split_input")
     filter_output = not cli_config.pop("no_filter_output")
     cfg = get_config(**cli_config)
-    origin = cfg.path.origin
-    destination = cfg.path.destination
     make_histogram(
-        origin=origin,
-        destination=destination,
+        origin=cfg.path.origin,
+        destination=cfg.path.destination,
         fname=output,
         parallel=parallel,
         max_workers=max_workers,
@@ -125,3 +123,5 @@ def hist():
         filter_output=filter_output,
         stacked=True
     )
+    return 0
+
