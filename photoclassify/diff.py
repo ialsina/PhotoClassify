@@ -25,24 +25,30 @@ def _ensure_paths(origin, destination):
         origin = Path(origin)
     if isinstance(destination, str):
         destination = Path(destination)
+    assert isinstance(origin, Path) and isinstance(destination, Path)
     return origin, destination
 
-def _get_paths(
+def _get_photopaths(
     origin: Optional[Path] = None,
     destination: Optional[Path] = None
-) -> Tuple[Sequence[Path], Sequence[Path]]:
+) -> Tuple[Sequence[PhotoPath], Sequence[PhotoPath]]:
     origin, destination = _ensure_paths(origin, destination)
     paths1 = []
     paths2 = []
     print("Collecting paths...")
+    print(origin)
+    print(destination)
     for root, _, files in os.walk(origin):
         for file in files:
-            paths1.append(Path(root) / file)
+            paths1.append(PhotoPath.from_path(Path(root) / file))
     for root, _, files in os.walk(destination):
         for file in files:
-            paths2.append(Path(root) / file)
+            paths2.append(PhotoPath.from_path(Path(root) / file))
     return paths1, paths2
 
+
+def _same_name(path1: PhotoPath, path2: PhotoPath):
+    return path1.same_name(path2)
 
 def _same_size(path1: Path, path2: Path):
     return path1.stat().st_size == path2.stat().st_size
@@ -112,16 +118,16 @@ def compare_stream(file1: Path, file2: Path, chunk_size: int = 8192) -> bool:
         return False
 
 FUN_FILTER = [
-    PhotoPath.same_name,
+    _same_name,
     _same_size,
 ]
 FUN_COMPARE = compare_stream
 
 def find_candidates(
-    paths1: Sequence[Path],
-    paths2: Sequence[Path],
-    *funs: Sequence[Callable[[Path, Path], bool]],
-) -> Mapping[Path, Sequence[Path]]:
+    paths1: Sequence[PhotoPath],
+    paths2: Sequence[PhotoPath],
+    *funs: Sequence[Callable[[PhotoPath, PhotoPath], bool]],
+) -> Mapping[PhotoPath, Sequence[PhotoPath]]:
     """
     Find and add candidate files from the destination paths that match the original paths based on specified criteria.
 
@@ -132,21 +138,22 @@ def find_candidates(
     """
     files_dest = {fpath.name: fpath for fpath in paths2}
     candidates = defaultdict(list)
+    # WARN: Poor performance
     for orig_path in tqdm(paths1, leave=False):
-        dest_path = files_dest.get(orig_path.name)
-        if dest_path and all(fun(orig_path, dest_path) for fun in funs):
-            candidates[orig_path].append(dest_path)
+        for dest_path in paths2:
+            if all(fun(orig_path, dest_path) for fun in funs):
+                candidates[orig_path].append(dest_path)
 
     return dict(candidates)
 
 def find_twins(
-    paths1: Sequence[Path],
-    paths2: Sequence[Path],
+    paths1: Sequence[PhotoPath],
+    paths2: Sequence[PhotoPath],
     fun_filter: Callable | Sequence[Callable] | None,
     fun_compare: Callable,
     *args,
     **kwargs,
-) -> Mapping[Path, Sequence[Path]]:
+) -> Mapping[PhotoPath, Sequence[PhotoPath]]:
     """
     Find and add twin files using parallel processing.
 
@@ -170,20 +177,20 @@ def find_twins(
     return dict(twins)
 
 def find_twins_parallel(
-    paths1: Sequence[Path],
-    paths2: Sequence[Path],
+    paths1: Sequence[PhotoPath],
+    paths2: Sequence[PhotoPath],
     fun_filter: Callable | Sequence[Callable] | None,
     fun_compare: Callable,
     *args,
     max_workers: Optional[int] = None,
     **kwargs,
-) -> Mapping[Path, Sequence[Path]]:
+) -> Mapping[PhotoPath, Sequence[PhotoPath]]:
     """
     Find and add twin files using parallel processing.
 
     Args:
-        paths1 (Sequence[Path]): List of original file paths.
-        paths2 (Sequence[Path]): List of destination file paths.
+        paths1 (Sequence[PhotoPath]): List of original file paths.
+        paths2 (Sequence[PhotoPath]): List of destination file paths.
     """
     if fun_filter is not None:
         print("Finding candidates...")
@@ -236,12 +243,12 @@ def find_files_with_copy(
     list of Path
         List of Path objects representing files in the origin directory that have copies in the destination directory.
     """
-    paths_origin, paths_destination = _get_paths(origin, destination)
+    paths_origin, paths_destination = _get_photopaths(origin, destination)
     if parallel:
         twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
     else:
         twins = find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
-    paths_origin_with_copy = [Path(p) for p in paths_origin if twins.get(p, [])]
+    paths_origin_with_copy = [p.path for p in paths_origin if twins.get(p, [])]
     return paths_origin_with_copy
 
 def find_files_without_copy(
@@ -269,7 +276,8 @@ def find_files_without_copy(
     list of Path
         List of Path objects representing files in the origin directory that do not have copies in the destination directory.
     """
-    paths_origin, _ = _get_paths(origin, destination)
+    paths_origin, _ = _get_photopaths(origin, destination)
+    paths_origin = [p.path for p in paths_origin]
     paths_with_copy = find_files_with_copy(
         origin=origin, destination=destination, parallel=parallel, max_workers=max_workers
     )
@@ -349,7 +357,7 @@ def make_histogram(
     stacked : bool, optional
         Whether to stack histograms, default is True.
     """
-    paths_origin, paths_destination = _get_paths(origin, destination)
+    paths_origin, paths_destination = _get_photopaths(origin, destination)
     if parallel:
         twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
     else:
@@ -425,7 +433,7 @@ def report(
             "'which' must be one of: 'candidates', 'twins', 'both'."
         )
 
-    paths_origin, paths_destination = _get_paths(origin, destination)
+    paths_origin, paths_destination = _get_photopaths(origin, destination)
 
     if which.lower() in {"c", "b", "candidates", "both"}:
         candidates = find_candidates(paths_origin, paths_destination, FUN_FILTER)

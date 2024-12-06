@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 
+# IDEA: This could be made inheriting from Path and with @property
 @dataclass
 class PhotoPath:
     parent: Path
@@ -26,6 +27,14 @@ class PhotoPath:
         )
 
     @property
+    def name(self) -> str:
+        return "{stem}_x{counter:>02s}{suffix}".format(
+            stem=self.stem,
+            counter=hex(self.counter)[2:],
+            suffix=self.suffix,
+        )
+
+    @property
     def next(self) -> "PhotoPath":
         return PhotoPath(
             parent=self.parent,
@@ -36,11 +45,8 @@ class PhotoPath:
 
     @property
     def path(self) -> Path:
-        return self.parent / "{stem}_x{counter:>02s}{suffix}".format(
-            stem=self.stem,
-            counter=hex(self.counter)[2:],
-            suffix=self.suffix,
-        )
+        return self.parent / self.name
 
     def same_name(self, other: "PhotoPath") -> bool:
         return (self.stem, self.suffix) == (other.stem, other.suffix)
+
