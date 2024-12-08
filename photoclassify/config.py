@@ -14,11 +14,11 @@ ROOT = Path(__file__).resolve().parent.parent
 # Find App data path
 if os.name == "posix":
     if os.uname().sysname == "Darwin":  # macOS-specific
-        APP_DATA_PATH = Path.home() / "Library" / "Application Support" / "photoclassify"
+        APP_DATA_PATH = Path.home() / "Library" / "Application Support" / "photocatalog"
     else:  # Linux and other Unix-like systems
-        APP_DATA_PATH = Path.home() / ".photoclassify"
+        APP_DATA_PATH = Path.home() / ".photocatalog"
 elif os.name == "nt":
-    APP_DATA_PATH = Path.home() / "AppData" / "Local" / "photoclassify"
+    APP_DATA_PATH = Path.home() / "AppData" / "Local" / "photocatalog"
 else:
     raise OSError("Unknown Platform.")
 
