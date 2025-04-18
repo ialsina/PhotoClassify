@@ -128,24 +128,4 @@ Photo metadata is stored in a dictionary with the following structure:
        'size': int,
        'date': datetime,
        'metadata': dict
-   }
-
-Exceptions
-----------
-
-.. automodule:: photoclassify.exceptions
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Custom exceptions used throughout the package.
-
-Utilities
----------
-
-.. automodule:: photoclassify.utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Helper functions and utilities used across the package. 
+   } 
