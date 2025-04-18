@@ -10,47 +10,80 @@ from photoclassify.diff import (
     report,
 )
 
+
 def _get_base_parser() -> ArgumentParser:
     parser = ArgumentParser(add_help=True, formatter_class=RawTextHelpFormatter)
     parser.add_argument("PATH.origin", action="store", metavar="ORIGIN", default=None)
-    parser.add_argument("PATH.destination", action="store", metavar="DESTINATION", default=None)
-    parser.add_argument("-o", "--output", action="store", metavar="OUTPUT", default=None)
+    parser.add_argument(
+        "PATH.destination", action="store", metavar="DESTINATION", default=None
+    )
+    parser.add_argument(
+        "-o", "--output", action="store", metavar="OUTPUT", default=None
+    )
     parser.add_argument("--no-parallel", "-P", action="store_true")
     parser.add_argument("--max-workers", "-W", action="store", default=None)
     return parser
 
+
 def _get_diff_parser() -> ArgumentParser:
     parser = _get_base_parser()
     parser.add_argument(
-        "-t", "--type",
+        "-t",
+        "--type",
         action="store",
         choices=["candidates", "twins", "both"],
         default="both",
         metavar="TYPE",
     )
     parser.add_argument(
-        "-1", "--level-one",
+        "-1",
+        "--level-one",
         action="store_true",
     )
     return parser
 
+
 def _get_copy_parser() -> ArgumentParser:
     parser = _get_base_parser()
     parser.add_argument("--remove", action="store_true", dest="COPY.remove_from_sd")
-    parser.add_argument("--verbose", "-v", action="count", default=0, dest="COPY.verbose")
+    parser.add_argument(
+        "--verbose", "-v", action="count", default=0, dest="COPY.verbose"
+    )
     parser.add_argument("-q", "--quarters", action="store_true", dest="PATH.quarters")
-    parser.add_argument("-H", "--day-starts-at", action="store", type=int, default=None, metavar="DAY_STARTS_AT", dest="DATE.day_starts_at")
-    parser.add_argument("-a", "--process-after", action="store", type=str, default=None, metavar="PROCESS_AFTER", dest="DATE.process_after")
-    parser.add_argument("-F", "--no-include-first", action="store_true", dest="DATE.no_include_first")
+    parser.add_argument(
+        "-H",
+        "--day-starts-at",
+        action="store",
+        type=int,
+        default=None,
+        metavar="DAY_STARTS_AT",
+        dest="DATE.day_starts_at",
+    )
+    parser.add_argument(
+        "-a",
+        "--process-after",
+        action="store",
+        type=str,
+        default=None,
+        metavar="PROCESS_AFTER",
+        dest="DATE.process_after",
+    )
+    parser.add_argument(
+        "-F", "--no-include-first", action="store_true", dest="DATE.no_include_first"
+    )
     return parser
+
 
 def _get_hist_parser() -> ArgumentParser:
     parser = _get_base_parser()
     parser.set_defaults(output="histogram.png")
-    parser.add_argument("-b", "--nbins", action="store", metavar="BINS", type=int, default=100)
+    parser.add_argument(
+        "-b", "--nbins", action="store", metavar="BINS", type=int, default=100
+    )
     parser.add_argument("-S", "--no-split-input", action="store_true")
     parser.add_argument("-F", "--no-filter-output", action="store_true")
     return parser
+
 
 def _clean_cli_config(cli_config):
     """Separate parallel, max_workers and output from config dictionary."""
@@ -59,6 +92,7 @@ def _clean_cli_config(cli_config):
     max_workers = cli_config.pop("max_workers")
     output = cli_config.pop("output")
     return parallel, max_workers, output
+
 
 def copy():
     cli_config = vars(_get_copy_parser().parse_args(sys.argv[1:]))
@@ -70,14 +104,11 @@ def copy():
         stdout = lambda txt: wf.write(f"{txt}\n")
     else:
         stdout = print
-    copy_photographs(cfg,
-                     parallel=parallel,
-                     max_workers=max_workers,
-                     stdout=stdout
-                     )
+    copy_photographs(cfg, parallel=parallel, max_workers=max_workers, stdout=stdout)
     if output:
         wf.close()  # type: ignore
     return 0
+
 
 def diff():
     cli_config = vars(_get_diff_parser().parse_args(sys.argv[1:]))
@@ -105,6 +136,7 @@ def diff():
         )
     return 0
 
+
 def hist():
     cli_config = vars(_get_hist_parser().parse_args(sys.argv[1:]))
     parallel, max_workers, output = _clean_cli_config(cli_config)
@@ -121,7 +153,6 @@ def hist():
         nbins=nbins,
         split_input=split_input,
         filter_output=filter_output,
-        stacked=True
+        stacked=True,
     )
     return 0
-

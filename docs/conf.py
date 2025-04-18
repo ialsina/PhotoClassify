@@ -1,38 +1,39 @@
 # Configuration file for the Sphinx documentation builder.
 import os
 import sys
-sys.path.insert(0, os.path.abspath('..'))
+
+sys.path.insert(0, os.path.abspath(".."))
 
 # Project information
-project = 'PhotoClassify'
-copyright = '2024, Your Name'
-author = 'Your Name'
-release = '1.0.0'
+project = "PhotoClassify"
+copyright = "2024, Your Name"
+author = "Your Name"
+release = "1.0.0"
 
 # General configuration
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx',
-    'sphinx_rtd_theme',
-    'sphinx_autodoc_typehints',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+    "sphinx_rtd_theme",
+    "sphinx_autodoc_typehints",
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # HTML theme settings
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
 
 # Autodoc settings
 autodoc_default_options = {
-    'members': True,
-    'member-order': 'bysource',
-    'special-members': '__init__',
-    'undoc-members': True,
-    'exclude-members': '__weakref__'
+    "members": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+    "undoc-members": True,
+    "exclude-members": "__weakref__",
 }
 
 # Napoleon settings
@@ -47,4 +48,4 @@ napoleon_use_admonition_for_references = True
 napoleon_use_ivar = True
 napoleon_use_param = True
 napoleon_use_rtype = True
-napoleon_type_aliases = None 
+napoleon_type_aliases = None

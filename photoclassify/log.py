@@ -2,15 +2,16 @@ import logging
 from typing import Optional
 import socket
 
-LOGGING_LEVELS = ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL')
+LOGGING_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
 
 def get_logger(
-        name: Optional[str] = None,
-        logging_level: str = "INFO",
-        filename: Optional[str] = None,
-        hostname: bool = True,
-        **kwargs
-    ) -> logging.Logger | logging.LoggerAdapter:
+    name: Optional[str] = None,
+    logging_level: str = "INFO",
+    filename: Optional[str] = None,
+    hostname: bool = True,
+    **kwargs,
+) -> logging.Logger | logging.LoggerAdapter:
     """Using in the logger function taken from the GSV to log
     errors, warnings and debugs.
 
@@ -34,7 +35,7 @@ def get_logger(
     if not logger.handlers:
         logging_level = logging_level.upper()
         logger.setLevel(logging_level)
-        formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
+        formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
         if filename:
             file_handler = logging.FileHandler(filename)
             file_handler.setFormatter(formatter)

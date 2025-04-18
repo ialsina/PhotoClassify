@@ -36,16 +36,14 @@ LAST_DATE_PATH = APP_DATA_PATH / ".lastdate"
 
 
 def read_date():
-    with open(LAST_DATE_PATH, 'r', encoding="utf-8") as rf:
-        return datetime.fromisoformat(
-            rf.readline()
-        )
+    with open(LAST_DATE_PATH, "r", encoding="utf-8") as rf:
+        return datetime.fromisoformat(rf.readline())
+
 
 def write_date():
-    with open(LAST_DATE_PATH, 'w', encoding="utf-8") as wf:
-        wf.write(
-            datetime.now().date().isoformat()
-        )
+    with open(LAST_DATE_PATH, "w", encoding="utf-8") as wf:
+        wf.write(datetime.now().date().isoformat())
+
 
 @dataclass
 class PathConfig:
@@ -63,17 +61,16 @@ class PathConfig:
 
     @classmethod
     def parse(cls, dct: Dict[str, str]):
-        path_config = cls(**{
-            key: Path(value) if isinstance(value, str) else value
-            for key, value
-            in dct.items()
-        })
+        path_config = cls(
+            **{
+                key: Path(value) if isinstance(value, str) else value
+                for key, value in dct.items()
+            }
+        )
         if path_config.safe and not path_config._is_dir():
-            raise AssertionError(
-                "Some paths are either invalid or unmounted."
-            )
+            raise AssertionError("Some paths are either invalid or unmounted.")
         return path_config
-        
+
 
 @dataclass
 class DateConfig:
@@ -108,8 +105,9 @@ class DateConfig:
         return cls(
             day_starts_at=day_starts_at,
             process_after=datetime.strptime(process_after, r"%d-%m-%Y"),
-            **dct
+            **dct,
         )
+
 
 @dataclass
 class CopyConfig:
@@ -120,6 +118,7 @@ class CopyConfig:
     @classmethod
     def parse(cls, dct):
         return cls(**dct)
+
 
 @dataclass
 class Config:
@@ -136,12 +135,11 @@ class Config:
             try:
                 subconfig_class = cls.__annotations__[subconfig_key]
             except KeyError as exc:
-                raise KeyError(
-                    f"Wrong subconfig group: {subconfig_key}."
-                ) from exc
+                raise KeyError(f"Wrong subconfig group: {subconfig_key}.") from exc
             subconfig_instance = subconfig_class.parse(subconfig_dict)
             dct_out[subconfig_key] = subconfig_instance
         return cls(**dct_out)
+
 
 def get_config(**kwargs) -> Config:
     """Get config from config file, overridden by kwargs."""
@@ -155,5 +153,6 @@ def get_config(**kwargs) -> Config:
                 config_f[key] = value
         config = unflatten(config_f, splitter="dot")
     return Config.parse(config)
+
 
 config = get_config()

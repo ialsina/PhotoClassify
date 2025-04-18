@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 
+
 # IDEA: This could be made inheriting from Path and with @property
 @dataclass
 class PhotoPath:
@@ -49,4 +50,3 @@ class PhotoPath:
 
     def same_name(self, other: "PhotoPath") -> bool:
         return (self.stem, self.suffix) == (other.stem, other.suffix)
-

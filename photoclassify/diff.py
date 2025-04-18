@@ -28,9 +28,9 @@ def _ensure_paths(origin, destination):
     assert isinstance(origin, Path) and isinstance(destination, Path)
     return origin, destination
 
+
 def _get_photopaths(
-    origin: Optional[Path] = None,
-    destination: Optional[Path] = None
+    origin: Optional[Path] = None, destination: Optional[Path] = None
 ) -> Tuple[Sequence[PhotoPath], Sequence[PhotoPath]]:
     origin, destination = _ensure_paths(origin, destination)
     paths1 = []
@@ -50,11 +50,14 @@ def _get_photopaths(
 def _same_name(path1: PhotoPath, path2: PhotoPath):
     return path1.same_name(path2)
 
+
 def _same_size(path1: Path, path2: Path):
     return path1.stat().st_size == path2.stat().st_size
 
+
 def _same_ctime(path1: Path, path2: Path):
     return path1.stat().st_ctime == path2.stat().st_ctime
+
 
 def compare_hash(file1: Path, file2: Path) -> bool:
     """
@@ -87,6 +90,7 @@ def calculate_file_hash(filepath: Path) -> str:
             sha256.update(chunk)
     return sha256.hexdigest()
 
+
 def compare_stream(file1: Path, file2: Path, chunk_size: int = 8192) -> bool:
     """
     Compare two files by streaming their contents and comparing chunks.
@@ -117,11 +121,13 @@ def compare_stream(file1: Path, file2: Path, chunk_size: int = 8192) -> bool:
         print(f"Error reading files: {e}")
         return False
 
+
 FUN_FILTER = [
     _same_name,
     _same_size,
 ]
 FUN_COMPARE = compare_stream
+
 
 def find_candidates(
     paths1: Sequence[PhotoPath],
@@ -145,6 +151,7 @@ def find_candidates(
                 candidates[orig_path].append(dest_path)
 
     return dict(candidates)
+
 
 def find_twins(
     paths1: Sequence[PhotoPath],
@@ -176,6 +183,7 @@ def find_twins(
 
     return dict(twins)
 
+
 def find_twins_parallel(
     paths1: Sequence[PhotoPath],
     paths2: Sequence[PhotoPath],
@@ -205,10 +213,8 @@ def find_twins_parallel(
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(fun_compare, p1, p2, *args, **kwargs): (p1, p2)
-            for p1
-            in paths1
-            for p2
-            in candidates[p1]
+            for p1 in paths1
+            for p2 in candidates[p1]
         }
         for future in tqdm(as_completed(futures), total=len(futures), leave=False):
             if future.result():
@@ -219,11 +225,11 @@ def find_twins_parallel(
 
 
 def find_files_with_copy(
-        origin: Path,
-        destination: Path,
-        parallel=True,
-        max_workers=None,
-    ) -> Sequence[Path]:
+    origin: Path,
+    destination: Path,
+    parallel=True,
+    max_workers=None,
+) -> Sequence[Path]:
     """
     Find files in the origin directory that have identical copies in the destination directory.
 
@@ -245,18 +251,25 @@ def find_files_with_copy(
     """
     paths_origin, paths_destination = _get_photopaths(origin, destination)
     if parallel:
-        twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
+        twins = find_twins_parallel(
+            paths_origin,
+            paths_destination,
+            FUN_FILTER,
+            FUN_COMPARE,
+            max_workers=max_workers,
+        )
     else:
         twins = find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
     paths_origin_with_copy = [p.path for p in paths_origin if twins.get(p, [])]
     return paths_origin_with_copy
 
+
 def find_files_without_copy(
-        origin: Path,
-        destination: Path,
-        parallel=True,
-        max_workers=None,
-    ) -> Sequence[Path]:
+    origin: Path,
+    destination: Path,
+    parallel=True,
+    max_workers=None,
+) -> Sequence[Path]:
     """
     Find files in the origin directory that do not have identical copies in the destination directory.
 
@@ -279,9 +292,13 @@ def find_files_without_copy(
     paths_origin, _ = _get_photopaths(origin, destination)
     paths_origin = [p.path for p in paths_origin]
     paths_with_copy = find_files_with_copy(
-        origin=origin, destination=destination, parallel=parallel, max_workers=max_workers
+        origin=origin,
+        destination=destination,
+        parallel=parallel,
+        max_workers=max_workers,
     )
     return [path for path in paths_origin if path not in paths_with_copy]
+
 
 def _make_histogram(
     paths1,
@@ -294,15 +311,12 @@ def _make_histogram(
 ):
     def _add_hist(ax, lst, label):
         ax.hist(
-            [
-                np.array([p.stat().st_size for p in lst_el]) / 1e6
-                for lst_el
-                in lst
-            ],
+            [np.array([p.stat().st_size for p in lst_el]) / 1e6 for lst_el in lst],
             bins=nbins,
             label=label,
             stacked=stacked,
         )
+
     fig, ax = plt.subplots(2, sharex=True)
     input_twins = [p for p in paths1 if twins.get(p, [])]
     input_no_twins = [p for p in paths1 if p not in input_twins]
@@ -359,7 +373,13 @@ def make_histogram(
     """
     paths_origin, paths_destination = _get_photopaths(origin, destination)
     if parallel:
-        twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
+        twins = find_twins_parallel(
+            paths_origin,
+            paths_destination,
+            FUN_FILTER,
+            FUN_COMPARE,
+            max_workers=max_workers,
+        )
     else:
         twins = find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
     fig = _make_histogram(
@@ -383,11 +403,7 @@ def _write_twins(
     level_two: bool = False,
 ):
     def get_line(number, path, l2):
-        main_line = (
-            f"\t{number:>4d}. {path}"
-            if number
-            else "\t" + path
-        )
+        main_line = f"\t{number:>4d}. {path}" if number else "\t" + path
         secondary_lines = (
             "\n" + "\n".join(f"\t\t\t\t- {el}" for el in getattr(path, l2))
             if l2
@@ -401,9 +417,7 @@ def _write_twins(
                 get_line(i, path, l2) for i, path in enumerate(sequence, start=1)
             )
         else:
-            buffer.writelines(
-                get_line(None, path, l2) for path in sequence
-            )
+            buffer.writelines(get_line(None, path, l2) for path in sequence)
 
     def writesequence(buffer, sequence, name, l2):
         buffer.write(f"\n\n{name}:\n{'=' * (len(name) + 1)}\n")
@@ -412,11 +426,9 @@ def _write_twins(
     with open(fname, "w", encoding="utf-8") as wf:
         with_twins = [path for path, lst in twins.items() if lst]
         without_twins = [path for path, lst in twins.items() if not lst]
-        writesequence(
-            wf, with_twins, "With twins",
-            "twins" if level_two else None
-        )
+        writesequence(wf, with_twins, "With twins", "twins" if level_two else None)
         writesequence(wf, without_twins, "Without twins", None)
+
 
 def report(
     origin: Path,
@@ -429,9 +441,7 @@ def report(
 ) -> None:
 
     if which.lower() not in {"c", "b", "t", "candidates", "twins", "both"}:
-        raise ValueError(
-            "'which' must be one of: 'candidates', 'twins', 'both'."
-        )
+        raise ValueError("'which' must be one of: 'candidates', 'twins', 'both'.")
 
     paths_origin, paths_destination = _get_photopaths(origin, destination)
 
@@ -440,7 +450,13 @@ def report(
         _write_twins(candidates, fname, line_numbers=True, level_two=level_two)
     if which.lower() in {"t", "b", "twins", "both"}:
         if parallel:
-            twins = find_twins_parallel(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE, max_workers=max_workers)
+            twins = find_twins_parallel(
+                paths_origin,
+                paths_destination,
+                FUN_FILTER,
+                FUN_COMPARE,
+                max_workers=max_workers,
+            )
         else:
             twins = find_twins(paths_origin, paths_destination, FUN_FILTER, FUN_COMPARE)
         _write_twins(twins, fname, line_numbers=True, level_two=level_two)
@@ -448,12 +464,11 @@ def report(
 
 if __name__ == "__main__":
     import sys
+
     try:
         origin, destination, fname = sys.argv[1:]
     except ValueError:
-        print(
-            "Please, call using 'python3 diff.py <ORIGIN> <DESTINATION> <FNAME>'."
-        )
+        print("Please, call using 'python3 diff.py <ORIGIN> <DESTINATION> <FNAME>'.")
         sys.exit(1)
 
     report(
@@ -465,4 +480,3 @@ if __name__ == "__main__":
         max_workers=None,
         level_two=True,
     )
-

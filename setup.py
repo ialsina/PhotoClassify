@@ -4,8 +4,8 @@ with open("requirements.txt", "r", encoding="utf-8") as f:
     requirements = f.read().splitlines()
 
 setup(
-    name='PhotoClassify',
-    version='0.0.1',
+    name="PhotoClassify",
+    version="0.0.1",
     packages=find_packages(),
     install_requires=requirements,
     entry_points={
@@ -14,5 +14,5 @@ setup(
             "phdiff=photoclassify.entrypoints:diff",
             "phhist=photoclassify.entrypoints:hist",
         ]
-    }
+    },
 )

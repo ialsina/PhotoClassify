@@ -18,11 +18,13 @@ from photoclassify.photopath import PhotoPath
 
 MAX_RENAME_ALLOWED = 20
 
+
 class CopyStatus(Enum):
     SUCCESS = 1
     EXISTING = 2
     RENAMED = 3
     ERROR = 4
+
 
 @dataclass
 class CopyResult:
@@ -45,6 +47,7 @@ class CopyResult:
     exceptions : List[Exception]
         A list of exceptions encountered during copying.
     """
+
     dates: Dict[Path, str]
     successful: List[Tuple[str, str]] = field(default_factory=list)
     existing: List[Tuple[str, str]] = field(default_factory=list)
@@ -54,7 +57,9 @@ class CopyResult:
 
     @staticmethod
     def _tuples_str_generator(sequence_of_tuples):
-        return '\n\t'.join(f"{str(ofp)} -> {str(dfp)}" for ofp, dfp in sequence_of_tuples)
+        return "\n\t".join(
+            f"{str(ofp)} -> {str(dfp)}" for ofp, dfp in sequence_of_tuples
+        )
 
     def report(
         self,
@@ -75,28 +80,31 @@ class CopyResult:
             Function to use for printing the report (default is `print`).
         """
         total_len = len(self.dates)
-        stdout('Copy terminated')
+        stdout("Copy terminated")
         if verbose >= 2:
-            stdout(f'Successful copies: {len(self.successful)} out of {total_len}')
+            stdout(f"Successful copies: {len(self.successful)} out of {total_len}")
             if len(self.existing) > 0:
-                stdout('***')
-                stdout(f'Existing files: {len(self.existing)} out of {total_len}')
+                stdout("***")
+                stdout(f"Existing files: {len(self.existing)} out of {total_len}")
         if verbose >= 3:
             stdout(self._tuples_str_generator(self.existing))
         if verbose >= 2:
             if len(self.renamed) > 0:
-                stdout('***')
-                stdout(f'Renamed files: {len(self.renamed)} out of {total_len}')
+                stdout("***")
+                stdout(f"Renamed files: {len(self.renamed)} out of {total_len}")
                 stdout(self._tuples_str_generator(self.renamed))
         if verbose >= 2:
             if len(self.unsuccessful) > 0:
-                stdout('***')
-                stdout(f'Unsuccessful copies: {len(self.unsuccessful)} out of {total_len}')
+                stdout("***")
+                stdout(
+                    f"Unsuccessful copies: {len(self.unsuccessful)} out of {total_len}"
+                )
                 stdout(self._tuples_str_generator(self.unsuccessful))
         if verbose >= 3:
-            stdout('> Errors encountered:')
-            stdout('\n\t'.join(str(e) for e in self.exceptions))
-        stdout('***')
+            stdout("> Errors encountered:")
+            stdout("\n\t".join(str(e) for e in self.exceptions))
+        stdout("***")
+
 
 def _get_target_path(datestamp: str, cfg: Config):
     """
@@ -121,7 +129,9 @@ def _get_target_path(datestamp: str, cfg: Config):
     return cfg.path.destination / quarter / datestamp
 
 
-def get_filepaths(cfg: Config) -> Tuple[List[Path], Dict[str, List[Path]], Dict[Path, str]]:
+def get_filepaths(
+    cfg: Config,
+) -> Tuple[List[Path], Dict[str, List[Path]], Dict[Path, str]]:
     """
     Retrieves image file paths from the origin directory,
     classifies them by creation date, and stores them in a dictionary.
@@ -179,15 +189,13 @@ def _create_directories(dates: List[str], cfg: Config):
         If a directory cannot be created.
     """
     if not (
-        isinstance(dates, list)
-        and all(isinstance(element, str) for element in dates)
+        isinstance(dates, list) and all(isinstance(element, str) for element in dates)
     ):
-        raise TypeError(
-            "dates should be of type List[str]."
-        )
+        raise TypeError("dates should be of type List[str].")
     for date in dates:
         target_path = _get_target_path(date, cfg)
         target_path.mkdir(parents=True, exist_ok=True)
+
 
 def _copy_file_task(origin_fpath, destin_path):
     """Helper function for copy"""
@@ -203,9 +211,15 @@ def _copy_file_task(origin_fpath, destin_path):
             if not destin_fpath.exists():
                 shutil.copy2(origin_fpath, destin_fpath)
                 return CopyStatus.RENAMED, origin_fpath, destin_fpath, None
-        return CopyStatus.ERROR, origin_fpath, None, RuntimeError("Too many rename attempts")
+        return (
+            CopyStatus.ERROR,
+            origin_fpath,
+            None,
+            RuntimeError("Too many rename attempts"),
+        )
     except (FileNotFoundError, PermissionError, OSError) as exc:
         return CopyStatus.ERROR, origin_fpath, None, exc
+
 
 def _copy_imgdates(
     imgdates: Dict[Path, str],
@@ -234,7 +248,9 @@ def _copy_imgdates(
     with tqdm(total=len(tasks), desc="Copying files", unit="file") as pbar:
         for origin_fpath, datestamp in imgdates.items():
             destin_fpath = _get_target_path(datestamp, cfg)
-            status, origin_fpath, destin_fpath, exc = _copy_file_task(origin_fpath, destin_fpath)
+            status, origin_fpath, destin_fpath, exc = _copy_file_task(
+                origin_fpath, destin_fpath
+            )
             if status == CopyStatus.SUCCESS:
                 result.successful.append((origin_fpath, destin_fpath))
             elif status == CopyStatus.EXISTING:
@@ -248,10 +264,9 @@ def _copy_imgdates(
 
     return result
 
+
 def _copy_imgdates_parallel(
-    imgdates: Dict[Path, str],
-    cfg: Config,
-    max_workers: Optional[int] = None
+    imgdates: Dict[Path, str], cfg: Config, max_workers: Optional[int] = None
 ):
     """
     Copies image files to a destination path organized by date.
@@ -296,11 +311,12 @@ def _copy_imgdates_parallel(
 
     return result
 
+
 def copy_photographs(
     cfg: Config,
     parallel: bool = True,
     max_workers: Optional[int] = None,
-    stdout: Optional[Callable] = None
+    stdout: Optional[Callable] = None,
 ) -> None:
     """
     Copies photographs according to the provided configuration.
@@ -325,9 +341,9 @@ def copy_photographs(
         stdout = print
     if cfg.copy.verbose >= 1:
         stdout(
-            'Copying files:\n'
-            f'\t         FROM: {str(cfg.path.origin):<30s}\n'
-            f'\t           TO: {str(cfg.path.destination):<30s}\n'
+            "Copying files:\n"
+            f"\t         FROM: {str(cfg.path.origin):<30s}\n"
+            f"\t           TO: {str(cfg.path.destination):<30s}\n"
             f'\tSTARTING DATE: {cfg.date.first_date.strftime(r"%d-%m-%Y"):<30s}'
         )
     if parallel:
@@ -341,4 +357,3 @@ def copy_photographs(
 
 if __name__ == "__main__":
     copy_photographs(get_config())
-
