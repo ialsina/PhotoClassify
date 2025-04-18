@@ -1,4 +1,4 @@
-.PHONY: test test-cov lint type-check clean format
+.PHONY: test test-cov lint type-check clean format pre-commit-install pre-commit-update pre-commit-run
 
 # Python interpreter
 PYTHON = python3
@@ -9,6 +9,18 @@ COVERAGE_THRESHOLD = 80
 # Install development dependencies
 install-dev:
 	pip install -r requirements-dev.txt
+
+# Install pre-commit hooks
+pre-commit-install:
+	pre-commit install
+
+# Update pre-commit hooks
+pre-commit-update:
+	pre-commit autoupdate
+
+# Run pre-commit on all files
+pre-commit-run:
+	pre-commit run --all-files
 
 # Run all tests
 test:
@@ -46,7 +58,7 @@ format:
 	black photoclassify/ tests/
 
 # Run all checks
-check: lint type-check test-cov
+check: lint type-check test-cov pre-commit-run
 
 # Default target
-all: install-dev check 
+all: install-dev pre-commit-install check 
