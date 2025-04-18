@@ -1,0 +1,116 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PhotoClassify"
+version = "0.0.1"
+description = "A tool for managing and organizing photo collections"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Ivan Alsina Ferrer", email = "ivanalsina@tutanota.com"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Utilities",
+]
+keywords = ["photos", "organization", "management", "duplicates"]
+dependencies = [
+    "aiofiles>=23.2.1",
+    "aiosqlite>=0.19.0",
+    "click>=8.1.7",
+    "pillow>=10.1.0",
+    "pyyaml>=6.0.1",
+    "rich>=13.6.0",
+    "tqdm>=4.66.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/ialsina/PhotoClassify"
+Documentation = "https://photoclassify.readthedocs.io/"
+Repository = "https://github.com/ialsina/PhotoClassify.git"
+Issues = "https://github.com/ialsina/PhotoClassify/issues"
+Changelog = "https://github.com/ialsina/PhotoClassify/blob/main/CHANGELOG.md"
+
+[project.scripts]
+phcopy = "photoclassify.entrypoints:copy"
+phdiff = "photoclassify.entrypoints:diff"
+phhist = "photoclassify.entrypoints:hist"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid-wrap = 0
+use_parentheses = true
+line_length = 88
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203"]
+max-complexity = 10
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tests.*",
+]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
+
+[tool.coverage.run]
+source = ["photoclassify"]
+omit = [
+    "*/tests/*",
+    "*/setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+] 
