@@ -82,7 +82,7 @@ photoclassify.log
 Logging configuration and utilities.
 
 photoclassify.photopath
-~~~~~~~~~~~~~~~~~~~~~~~
+~yourusername~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: photoclassify.photopath
    :members:
